@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "my-project-859f5",
+    "prod": "my-project-859f5"
+  },
+  "targets": {},
+  "etags": {}
+}
