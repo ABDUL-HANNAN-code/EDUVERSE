@@ -104,8 +104,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       isLoadingProfile = false;
     });
 
-    // Keep dashboard tabs minimal (Timetable, Manage Users)
-    final tabLength = 2;
+    final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 1 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
 
     if (isSuperAdmin) {
@@ -172,9 +171,11 @@ class _AdminDashboardState extends State<AdminDashboard>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
-            Tab(icon: Icon(Icons.people), text: "Manage Users"),
+          tabs: [
+            const Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
+            const Tab(icon: Icon(Icons.people), text: "Manage Users"),
+            if (isSuperAdmin || isUniversityAdmin)
+              const Tab(icon: Icon(Icons.store_mall_directory), text: 'Manage Marketplaces'),
           ],
         ),
       ),
@@ -184,6 +185,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         children: [
           _buildGridTimetable(),
           _buildUserManager(),
+          if (isSuperAdmin || isUniversityAdmin) const MarketplaceAdminList(),
         ],
       ),
       floatingActionButton: _tabController.index == 0
