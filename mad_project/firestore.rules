@@ -104,6 +104,37 @@ service cloud.firestore {
     }
 
     // Default: deny everything else
+    // Complaints stored at root for global queries, and mirrored under universities/{uni}/complaints
+    match /complaints/{complaintId} {
+      // Create: only authenticated users creating complaints for their own account
+      allow create: if request.auth != null
+        // studentId must match caller
+        && request.resource.data.studentId == request.auth.uid
+        // uniId in the document must equal the user's uniId
+        && request.resource.data.uniId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniId;
+
+      // Read: owner, university admins for the same uni, or super-admin
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        // super-admin
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
+        // university admin for the complaint's uni
+        exists(/databases/$(database)/documents/universities/$(resource.data.uniId)/admins/$(request.auth.uid))
+      );
+
+      // Update: only university admins for the complaint's uni or super-admin
+      allow update: if request.auth != null && (
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
+        exists(/databases/$(database)/documents/universities/$(resource.data.uniId)/admins/$(request.auth.uid))
+      );
+
+      // Delete: owner or super-admin
+      allow delete: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+      );
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

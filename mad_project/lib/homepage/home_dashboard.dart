@@ -420,6 +420,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           description: 'Report issues',
           icon: Icons.report_problem,
           gradientColors: [Color(0xFFF39C12), Color(0xFFF1C40F)],
+          route: '/complaints',
         ),
         ModuleItem(
           title: 'Marketplace',
@@ -457,6 +458,17 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return GestureDetector(
       onTap: () {
         if (module.route != null) {
+          // Special-case Complaints: route admin users to admin view
+          if (module.route == '/complaints') {
+            final role = userRole;
+            final isAdmin = role == 'admin' || role == 'super_admin';
+            if (isAdmin) {
+              Get.toNamed('/complaints/admin');
+            } else {
+              Get.toNamed('/complaints');
+            }
+            return;
+          }
           Get.toNamed(module.route!);
         } else {
           Get.snackbar(

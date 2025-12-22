@@ -6,6 +6,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
+// Complaints views
+import 'complaints/views/student_complaint_view.dart';
+import 'complaints/views/create_complaint_screen.dart';
+import 'complaints/views/admin_complaint_list.dart';
 
 import 'shared.dart'; // Import Shared components
 import 'auth.dart'; // Import Auth logic
@@ -144,8 +148,11 @@ class UniversityApp extends StatelessWidget {
                 page: () => const TimetableScreen()), // Timetable module
             GetPage(name: '/admin', page: () => const AdminDashboard()),
 
-            GetPage(
-                name: '/marketplace', page: () => const StudentMarketplace()),
+            GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
+            // Complaints module
+            GetPage(name: '/complaints', page: () => StudentComplaintView()),
+            GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
+            GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
           ],
         );
       },

@@ -1,0 +1,234 @@
+// lib/complaints/services/complaint_service.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/complaint_model.dart';
+
+class ComplaintService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  static const String _collectionName = 'complaints';
+  static const String _anonymousId = 'ANONYMOUS_USER';
+
+  // Submit a new complaint
+  Future<String> submitComplaint({
+    required String title,
+    required String description,
+    required ComplaintCategory category,
+    required ComplaintUrgency urgency,
+    required bool isAnonymous,
+    required String uniId,
+    required String deptId,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Basic validation: ensure university and department are provided
+      if (uniId.isEmpty || deptId.isEmpty) {
+        throw Exception('Missing university or department information in user profile. Please update your profile.');
+      }
+
+      final complaint = ComplaintModel(
+        id: '',
+        title: title,
+        description: description,
+        category: category,
+        urgency: urgency,
+        status: ComplaintStatus.pending,
+        isAnonymous: isAnonymous,
+        studentId: isAnonymous ? _anonymousId : user.uid,
+        uniId: uniId,
+        deptId: deptId,
+        createdAt: DateTime.now(),
+      );
+
+      try {
+        // Create in a batch: write to root collection and mirror under universities/{uniId}/complaints
+        final docRef = _firestore.collection(_collectionName).doc();
+        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(docRef.id);
+
+        final data = complaint.toFirestore();
+
+        final batch = _firestore.batch();
+        batch.set(docRef, data);
+        batch.set(uniRef, data);
+        await batch.commit();
+
+        return docRef.id;
+      } on FirebaseException catch (fe) {
+        if (fe.code == 'permission-denied') {
+          throw Exception('Permission denied when creating complaint. Check Firestore security rules and ensure authenticated users are allowed to create complaints. (${fe.message})');
+        }
+        rethrow;
+      }
+    } catch (e) {
+      throw Exception('Failed to submit complaint: $e');
+    }
+  }
+
+  // Get student's own complaints stream
+  Stream<List<ComplaintModel>> getStudentComplaints() {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
+
+    // Read from root collection where studentId == uid
+    return _firestore
+      .collection(_collectionName)
+      .where('studentId', isEqualTo: user.uid)
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList());
+  }
+
+  // Get all complaints for admin (filtered by university and department)
+  Stream<List<ComplaintModel>> getAdminComplaints({
+    required String uniId,
+    required String deptId,
+    ComplaintStatus? statusFilter,
+  }) {
+    Query query = _firestore.collection(_collectionName).where('uniId', isEqualTo: uniId);
+
+    if (deptId.isNotEmpty) {
+      query = query.where('deptId', isEqualTo: deptId);
+    }
+
+    if (statusFilter != null) {
+      query = query.where('status', isEqualTo: statusFilter.name);
+    }
+
+    return query.orderBy('createdAt', descending: true).snapshots().map((snapshot) => snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList());
+  }
+
+  // Update complaint status
+  Future<void> updateComplaintStatus({
+    required String complaintId,
+    required ComplaintStatus newStatus,
+  }) async {
+    try {
+      // Update both root doc and mirrored uni doc if present
+      final rootRef = _firestore.collection(_collectionName).doc(complaintId);
+      final doc = await rootRef.get();
+      if (!doc.exists) throw Exception('Complaint not found');
+      final uniId = doc.data()?['uniId'] ?? '';
+
+      final batch = _firestore.batch();
+      batch.update(rootRef, {'status': newStatus.name, 'updatedAt': FieldValue.serverTimestamp()});
+      if (uniId != '') {
+        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
+        batch.update(uniRef, {'status': newStatus.name, 'updatedAt': FieldValue.serverTimestamp()});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to update status: $e');
+    }
+  }
+
+  // Add admin reply
+  Future<void> addAdminReply({
+    required String complaintId,
+    required String reply,
+  }) async {
+    try {
+      final rootRef = _firestore.collection(_collectionName).doc(complaintId);
+      final doc = await rootRef.get();
+      if (!doc.exists) throw Exception('Complaint not found');
+      final uniId = doc.data()?['uniId'] ?? '';
+
+      final batch = _firestore.batch();
+      batch.update(rootRef, {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      if (uniId != '') {
+        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
+        batch.update(uniRef, {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to add reply: $e');
+    }
+  }
+
+  // Update status and add reply together
+  Future<void> updateComplaintWithReply({
+    required String complaintId,
+    required ComplaintStatus newStatus,
+    required String reply,
+  }) async {
+    try {
+      final rootRef = _firestore.collection(_collectionName).doc(complaintId);
+      final doc = await rootRef.get();
+      if (!doc.exists) throw Exception('Complaint not found');
+      final uniId = doc.data()?['uniId'] ?? '';
+
+      final batch = _firestore.batch();
+      batch.update(rootRef, {'status': newStatus.name, 'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      if (uniId != '') {
+        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
+        batch.update(uniRef, {'status': newStatus.name, 'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to update complaint: $e');
+    }
+  }
+
+  // Get complaint statistics for student
+  Future<Map<String, int>> getStudentStatistics() async {
+    final user = _auth.currentUser;
+    if (user == null) return {'pending': 0, 'inProgress': 0, 'resolved': 0};
+
+    try {
+      final snapshot = await _firestore
+          .collection(_collectionName)
+          .where('studentId', isEqualTo: user.uid)
+          .get();
+
+      int pending = 0;
+      int inProgress = 0;
+      int resolved = 0;
+
+      for (var doc in snapshot.docs) {
+        final complaint = ComplaintModel.fromFirestore(doc);
+        switch (complaint.status) {
+          case ComplaintStatus.pending:
+            pending++;
+            break;
+          case ComplaintStatus.inProgress:
+            inProgress++;
+            break;
+          case ComplaintStatus.resolved:
+            resolved++;
+            break;
+        }
+      }
+
+      return {
+        'pending': pending,
+        'inProgress': inProgress,
+        'resolved': resolved,
+      };
+    } catch (e) {
+      return {'pending': 0, 'inProgress': 0, 'resolved': 0};
+    }
+  }
+
+  // Delete a complaint (optional, for students to remove their own)
+  Future<void> deleteComplaint(String complaintId) async {
+    try {
+      final rootRef = _firestore.collection(_collectionName).doc(complaintId);
+      final doc = await rootRef.get();
+      if (!doc.exists) return;
+      final uniId = doc.data()?['uniId'] ?? '';
+
+      final batch = _firestore.batch();
+      batch.delete(rootRef);
+      if (uniId != '') {
+        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
+        batch.delete(uniRef);
+      }
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Failed to delete complaint: $e');
+    }
+  }
+}
