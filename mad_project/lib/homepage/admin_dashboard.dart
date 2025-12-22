@@ -106,6 +106,10 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 1 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
+    // Ensure UI updates (FAB visibility) when the selected tab changes
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     if (isSuperAdmin) {
       await _fetchAllUniversities();
@@ -416,17 +420,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   setState(() => selectedShift = val ?? 'morning'),
             ),
           ),
-          // Manage Marketplaces - visible to university admins and super admins
-          if (isSuperAdmin || isUniversityAdmin)
-            ListTile(
-              leading: const Icon(Icons.store_mall_directory),
-              title: const Text('Manage Marketplaces'),
-              onTap: () {
-                // close drawer then navigate
-                Navigator.of(context).pop();
-                Get.to(() => const MarketplaceAdminList());
-              },
-            ),
+          // Manage Marketplaces - removed from drawer; accessible via Dashboard tab
         ],
       ),
     );
