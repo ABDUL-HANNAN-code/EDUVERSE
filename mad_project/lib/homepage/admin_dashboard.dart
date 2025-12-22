@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
-import '../poster/admin_poster_manager.dart';
+// Poster manager removed from admin dashboard per UX request
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -104,7 +104,8 @@ class _AdminDashboardState extends State<AdminDashboard>
       isLoadingProfile = false;
     });
 
-    final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 1 : 0);
+    // Keep dashboard tabs minimal (Timetable, Manage Users)
+    final tabLength = 2;
     _tabController = TabController(length: tabLength, vsync: this);
 
     if (isSuperAdmin) {
@@ -171,12 +172,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: [
-            const Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
-            const Tab(icon: Icon(Icons.people), text: "Manage Users"),
-            if (isSuperAdmin || isUniversityAdmin)
-              const Tab(
-                  icon: Icon(Icons.photo_library), text: 'Poster Management'),
+          tabs: const [
+            Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
+            Tab(icon: Icon(Icons.people), text: "Manage Users"),
           ],
         ),
       ),
@@ -186,7 +184,6 @@ class _AdminDashboardState extends State<AdminDashboard>
         children: [
           _buildGridTimetable(),
           _buildUserManager(),
-          if (isSuperAdmin || isUniversityAdmin) const AdminPosterManager(),
         ],
       ),
       floatingActionButton: _tabController.index == 0

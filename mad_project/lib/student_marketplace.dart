@@ -418,8 +418,8 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                       final controller =
                           TextEditingController(text: _resolvedUniId ?? '');
                       final val = await Get.dialog<String?>(
-                        AlertDialog(
-                          title: const Text('Set university id (for testing)'),
+                              AlertDialog(
+                                title: const Text('Set university id'),
                           content: TextField(
                               controller: controller,
                               decoration: const InputDecoration(
@@ -535,7 +535,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
           child: PageView.builder(
             controller: _bannerController,
             itemCount: banners.length,
-            onPageChanged: (i) => setState(() => _currentBanner = i),
+            onPageChanged: (i) => _currentBanner = i,
             itemBuilder: (context, index) {
               final banner = banners[index];
               final data = banner.data() as Map<String, dynamic>;
