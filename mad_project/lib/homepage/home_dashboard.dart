@@ -402,6 +402,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
           description: 'Smart study assistant',
           icon: Icons.auto_awesome,
           gradientColors: [Color(0xFF9B59B6), Color(0xFFBB8FCE)],
+          route: '/ai-study-planner',
         ),
         ModuleItem(
           title: 'PDF Reader & AI',

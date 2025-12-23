@@ -17,6 +17,8 @@ import 'lost_and_found.dart'; // Import the Module
 import 'timetable/index.dart'; // Import Timetable Module
 import 'homepage/index.dart'; // Import Home Dashboard Module
 import 'homepage/admin_dashboard.dart';
+// AI Study Planner module
+import 'ai_study_planner/ai_study_planner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -153,6 +155,8 @@ class UniversityApp extends StatelessWidget {
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
             GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
             GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
+            // AI Study Planner module
+            GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
           ],
         );
       },
