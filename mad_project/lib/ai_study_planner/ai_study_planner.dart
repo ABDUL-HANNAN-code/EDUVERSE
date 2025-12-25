@@ -558,6 +558,28 @@ class FirestoreService {
         .doc(taskId)
         .update({'completed': completed});
   }
+
+  // Increment task duration (seconds) atomically
+  static Future<void> incrementTaskDuration(String taskId, int seconds) async {
+    final uniId = await getUniversityId();
+    if (uniId != null) {
+      await _db
+          .collection('universities')
+          .doc(uniId)
+          .collection('ai_planner')
+          .doc(userId)
+          .collection('tasks')
+          .doc(taskId)
+          .update({'duration_seconds': FieldValue.increment(seconds)});
+      return;
+    }
+    await _db
+        .collection('users')
+        .doc(userId)
+        .collection('tasks')
+        .doc(taskId)
+        .update({'duration_seconds': FieldValue.increment(seconds)});
+  }
 }
 
 // ============================================================================
@@ -777,6 +799,9 @@ class StudyDataProvider with ChangeNotifier {
   bool _sessionFinished = false; // set when a focus session reaches 0 and awaits user confirmation
   bool get sessionFinished => _sessionFinished;
   List<Task> _tasks = [];
+  // accumulate study seconds for today's updates
+  int _accumulatedSecondsSincePersist = 0;
+  int _taskSecondsSincePersist = 0;
   String? _selectedTaskId;
   String? get selectedTaskId => _selectedTaskId;
   // Performance spots for chart (FlSpot list) — keeps chart data easy to update
@@ -789,6 +814,18 @@ class StudyDataProvider with ChangeNotifier {
   List<Task> get tasks => _tasks;
   List<FlSpot> get performanceSpots => _performanceSpots;
   bool get isTimerRunning => _isTimerRunning;
+
+  // --- New: Graph data (7 days: Sun..Sat)
+  List<double> studyHours = [2, 3.5, 4, 2, 5, 6, 4];
+  List<double> focusTrends = [3, 4, 3, 5, 4, 7, 5];
+
+  double get maxGraphValue {
+    if (studyHours.isEmpty && focusTrends.isEmpty) return 6.0;
+    double maxH = studyHours.isNotEmpty ? studyHours.reduce((a, b) => a > b ? a : b) : 0.0;
+    double maxF = focusTrends.isNotEmpty ? focusTrends.reduce((a, b) => a > b ? a : b) : 0.0;
+    final m = (maxH > maxF ? maxH : maxF) + 2.0;
+    return m;
+  }
   String? _lastTimerEvent; // 'success' or 'failed' or null
   String? get lastTimerEvent => _lastTimerEvent;
 
@@ -883,6 +920,38 @@ class StudyDataProvider with ChangeNotifier {
                 _performanceSpots = raw
                     .map((e) => FlSpot((e['x'] as num).toDouble(), (e['y'] as num).toDouble()))
                     .toList();
+              } catch (_) {}
+            }
+            // Load persisted study hours and focus trends if present
+            if (data['study_hours'] != null) {
+              try {
+                final raw = List<dynamic>.from(data['study_hours']);
+                final parsed = raw.map<double>((e) {
+                  if (e is num) return e.toDouble();
+                  return double.tryParse(e.toString()) ?? 0.0;
+                }).toList();
+                if (parsed.length >= 7) {
+                  studyHours = parsed.sublist(0, 7);
+                } else if (parsed.isNotEmpty) {
+                  // pad to 7
+                  studyHours = List<double>.from(parsed);
+                  while (studyHours.length < 7) studyHours.add(0.0);
+                }
+              } catch (_) {}
+            }
+            if (data['focus_trends'] != null) {
+              try {
+                final raw = List<dynamic>.from(data['focus_trends']);
+                final parsed = raw.map<double>((e) {
+                  if (e is num) return e.toDouble();
+                  return double.tryParse(e.toString()) ?? 0.0;
+                }).toList();
+                if (parsed.length >= 7) {
+                  focusTrends = parsed.sublist(0, 7);
+                } else if (parsed.isNotEmpty) {
+                  focusTrends = List<double>.from(parsed);
+                  while (focusTrends.length < 7) focusTrends.add(0.0);
+                }
               } catch (_) {}
             }
             notifyListeners();
@@ -1020,6 +1089,48 @@ class StudyDataProvider with ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) async {
       if (_remainingSeconds > 0) {
         _remainingSeconds -= 1;
+        // Track study time live: attribute seconds to today's entry and selected task
+        try {
+          if (!_isBreakMode) {
+            // increment accumulators
+            _accumulatedSecondsSincePersist += 1;
+            // ensure studyHours has 7 entries
+            if (studyHours.length < 7) studyHours = List<double>.filled(7, 0.0);
+            final todayIndex = DateTime.now().weekday % 7; // Sun=0, Mon=1 ... Sat=6
+            studyHours[todayIndex] = (studyHours[todayIndex]) + (1.0 / 3600.0);
+
+            // if a task is selected, increment its tracked duration
+            if (_selectedTaskId != null) {
+              final ti = _tasks.indexWhere((t) => t.id == _selectedTaskId);
+              if (ti != -1) {
+                _tasks[ti].durationSeconds += 1;
+                _taskSecondsSincePersist += 1;
+              }
+            }
+
+            // Persist in batches every 15 seconds to avoid excessive writes
+            if (_accumulatedSecondsSincePersist >= 15) {
+              try {
+                await FirestoreService.updateStudyData({'study_hours': studyHours});
+              } catch (e) {
+                debugPrint('Failed to persist study hours: $e');
+              }
+              _accumulatedSecondsSincePersist = 0;
+            }
+
+            if (_taskSecondsSincePersist >= 15 && _selectedTaskId != null) {
+              try {
+                await FirestoreService.updateTaskDuration(_selectedTaskId!, _taskSecondsSincePersist);
+              } catch (e) {
+                debugPrint('Failed to persist task duration increment: $e');
+              }
+              _taskSecondsSincePersist = 0;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error tracking live study time: $e');
+        }
+
         notifyListeners();
       } else {
         // stop at zero and trigger session behavior
@@ -1054,6 +1165,23 @@ class StudyDataProvider with ChangeNotifier {
     _timer?.cancel();
     _timer = null;
     _isTimerRunning = false;
+    // Persist any accumulated study seconds and task seconds
+    try {
+      if (_accumulatedSecondsSincePersist > 0) {
+        FirestoreService.updateStudyData({'study_hours': studyHours});
+        _accumulatedSecondsSincePersist = 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to persist study hours on pause: $e');
+    }
+    try {
+      if (_taskSecondsSincePersist > 0 && _selectedTaskId != null) {
+        FirestoreService.updateTaskDuration(_selectedTaskId!, _taskSecondsSincePersist);
+        _taskSecondsSincePersist = 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to persist task duration on pause: $e');
+    }
     notifyListeners();
   }
 
@@ -1074,6 +1202,24 @@ class StudyDataProvider with ChangeNotifier {
         debugPrint('Error marking task complete after session: $e');
       }
     }
+    // Persist any remaining accumulated seconds
+    try {
+      if (_accumulatedSecondsSincePersist > 0) {
+        await FirestoreService.updateStudyData({'study_hours': studyHours});
+        _accumulatedSecondsSincePersist = 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to persist study hours on session end: $e');
+    }
+    try {
+      if (_taskSecondsSincePersist > 0 && _selectedTaskId != null) {
+        await FirestoreService.updateTaskDuration(_selectedTaskId!, _taskSecondsSincePersist);
+        _taskSecondsSincePersist = 0;
+      }
+    } catch (e) {
+      debugPrint('Failed to persist task duration on session end: $e');
+    }
+
     // Enter break mode
     _isBreakMode = true;
     _remainingSeconds = _breakDuration;
@@ -1195,93 +1341,73 @@ class StudyPlannerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
-    final isMobile = width < 800;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF2D2557),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF2D2557),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
         title: Text(
           'AI Study Planner',
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             fontSize: 20,
+            color: Colors.white,
           ),
         ),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [kPrimaryColor, kSecondaryColor],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-        ),
-        elevation: 0,
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_outlined, color: Colors.white),
             onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
           ),
         ],
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
-          child: isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ProgressCard(),
-                    const SizedBox(height: 12),
-                    FocusCard(),
-                    const SizedBox(height: 12),
-                    TasksCard(),
-                    const SizedBox(height: 12),
-                    CreatePlanCard(),
-                    const SizedBox(height: 12),
-                    ChatInterface(),
-                    const SizedBox(height: 12),
-                    AnalyticsPanel(),
-                  ],
-                )
-              : Column(
-                  children: [
-                    // Dashboard Summary Row
-                    Row(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top Row: Progress/Create Plan (Left) + Focus Timer (Right)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
                       children: [
-                        Expanded(child: ProgressCard()),
-                        const SizedBox(width: 16),
-                        Expanded(child: FocusCard()),
+                        ProgressCard(),
+                        const SizedBox(height: 12),
+                        CreatePlanCard(),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    // Task & Action Row
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: TasksCard()),
-                        const SizedBox(width: 16),
-                        Expanded(flex: 2, child: CreatePlanCard()),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    // Interactive Section
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: ChatInterface()),
-                        const SizedBox(width: 16),
-                        Expanded(flex: 2, child: AnalyticsPanel()),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: FocusCard()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              
+              // Tasks - Full Width
+              TasksCard(),
+              const SizedBox(height: 12),
+              
+              // Chat Interface
+              ChatInterface(),
+              const SizedBox(height: 12),
+              
+              // Analytics
+              AnalyticsPanel(),
+              const SizedBox(height: 12),
+              
+              // Resources
+              ResourcesCard(),
+            ],
+          ),
         ),
       ),
     );
@@ -1489,6 +1615,8 @@ class FocusCard extends StatelessWidget {
           selected = idx == -1 ? null : provider.tasks[idx];
         }
 
+        final isMobile = MediaQuery.of(context).size.width < 800;
+
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1515,9 +1643,10 @@ class FocusCard extends StatelessWidget {
                 provider.isBreakMode ? 'Break Time ☕' : 'Current Focus',
                 style: GoogleFonts.poppins(
                   color: kWhiteColor,
-                  fontSize: 16,
+                  fontSize: 20,
                   fontWeight: FontWeight.w600,
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
@@ -1547,8 +1676,8 @@ class FocusCard extends StatelessWidget {
                         }
                       },
                       child: Container(
-                        width: 100,
-                        height: 100,
+                        width: isMobile ? 84 : 100,
+                        height: isMobile ? 84 : 100,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                             border: Border.all(color: kWhiteColor, width: 4),
@@ -1559,7 +1688,7 @@ class FocusCard extends StatelessWidget {
                             '${provider.timerSeconds ~/ 60}:${(provider.timerSeconds % 60).toString().padLeft(2, '0')}',
                             style: GoogleFonts.poppins(
                               color: kWhiteColor,
-                              fontSize: 18,
+                              fontSize: isMobile ? 16 : 18,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1592,7 +1721,7 @@ class FocusCard extends StatelessWidget {
                               provider.setTaskDuration(provider.selectedTaskId!, mins * 60);
                             }
                           },
-                          child: const Text('Set Time'),
+                          child: const Text('Set Time',style: TextStyle(color: Colors.white),),
                         ),
                         const SizedBox(width: 8),
                         // Removed 'Fail' button — failures now prompt a styled extend sheet automatically.
@@ -1617,6 +1746,7 @@ class TasksCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<StudyDataProvider>(
       builder: (context, provider, _) {
+        final isMobile = MediaQuery.of(context).size.width < 800;
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -1660,13 +1790,17 @@ class TasksCard extends StatelessWidget {
                         final task = entry.value;
                         final selected = provider.selectedTaskId == task.id;
                         return ListTile(
-                          leading: Checkbox(
-                            value: task.isCompleted,
-                            activeColor: kPrimaryColor,
-                            onChanged: (v) => provider.toggleTask(idx),
+                          contentPadding: EdgeInsets.symmetric(vertical: isMobile ? 10 : 6, horizontal: 8),
+                          leading: Transform.scale(
+                            scale: isMobile ? 1.2 : 1.0,
+                            child: Checkbox(
+                              value: task.isCompleted,
+                              activeColor: kPrimaryColor,
+                              onChanged: (v) => provider.toggleTask(idx),
+                            ),
                           ),
-                          title: Text(task.title, style: GoogleFonts.poppins(fontSize: 14)),
-                          subtitle: Text('${(task.durationSeconds ~/ 60)} min'),
+                          title: Text(task.title, style: GoogleFonts.poppins(fontSize: isMobile ? 16 : 14)),
+                          subtitle: Text('${(task.durationSeconds ~/ 60)} min', style: GoogleFonts.poppins(fontSize: isMobile ? 13 : 12)),
                           tileColor: selected ? kPrimaryColor.withOpacity(0.08) : null,
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1719,15 +1853,7 @@ class TasksCard extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => _showAddTaskDialog(context),
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(
-                  'Add Task',
-                  style: GoogleFonts.poppins(fontSize: 14),
-                ),
-                style: TextButton.styleFrom(foregroundColor: kPrimaryColor),
-              ),
+
             ],
           ),
         );
@@ -1783,6 +1909,7 @@ class TasksCard extends StatelessWidget {
 class CreatePlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 800;
     return InkWell(
       onTap: () async {
         // AI option removed — open manual plan dialog directly
@@ -1801,7 +1928,7 @@ class CreatePlanCard extends StatelessWidget {
             ),
             actions: [
               TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor), onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Save')),
+              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor), onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Save', style: TextStyle(color: Colors.white))),
             ],
           ),
         );
@@ -1821,7 +1948,8 @@ class CreatePlanCard extends StatelessWidget {
         }
       },
       child: Container(
-        height: 200,
+        width: 200,
+        height: isMobile ? 130 : 200,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [kPrimaryColor, kSecondaryColor],
@@ -1937,7 +2065,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
         _scrollToBottom();
         
         final screenH = MediaQuery.of(context).size.height;
-        final double adaptiveHeight = min(420.0, screenH * 0.45).toDouble();
+        final screenW = MediaQuery.of(context).size.width;
+        final bool isNarrow = screenW < 800;
+        final double adaptiveHeight = isNarrow ? min(360.0, screenH * 0.38) : min(420.0, screenH * 0.45);
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           height: _isMaximized ? screenH - 80 : adaptiveHeight,
@@ -2097,9 +2227,13 @@ class _ChatInterfaceState extends State<ChatInterface> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'AI is thinking...',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                      Expanded(
+                        child: Text(
+                          'AI is thinking...',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+                        ),
                       ),
                     ],
                   ),
@@ -2367,6 +2501,16 @@ class AnalyticsPanel extends StatelessWidget {
                 height: 200,
                 child: Consumer<StudyDataProvider>(
                   builder: (context, provider, _) {
+                    // Build dynamic spots from provider data
+                    final studySpots = List<FlSpot>.generate(
+                      provider.studyHours.length,
+                      (i) => FlSpot(i.toDouble(), provider.studyHours[i]),
+                    );
+                    final focusSpots = List<FlSpot>.generate(
+                      provider.focusTrends.length,
+                      (i) => FlSpot(i.toDouble(), provider.focusTrends[i]),
+                    );
+
                     return LineChart(
                       LineChartData(
                         gridData: FlGridData(show: false),
@@ -2375,7 +2519,10 @@ class AnalyticsPanel extends StatelessWidget {
                             sideTitles: SideTitles(
                               showTitles: true,
                               reservedSize: 30,
+                              interval: 1,
                               getTitlesWidget: (value, meta) {
+                                // show only integer y labels to avoid clutter
+                                if ((value - value.toInt()).abs() > 0.001) return const SizedBox();
                                 return Text(
                                   value.toInt().toString(),
                                   style: GoogleFonts.poppins(fontSize: 10),
@@ -2386,13 +2533,17 @@ class AnalyticsPanel extends StatelessWidget {
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
+                              interval: 1,
                               getTitlesWidget: (value, meta) {
+                                // only show labels for whole-number x positions
+                                final intIndex = value.toInt();
                                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                                if (value.toInt() >= 0 && value.toInt() < days.length) {
+                                if ((value - intIndex).abs() > 0.001) return const SizedBox();
+                                if (intIndex >= 0 && intIndex < days.length) {
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Text(
-                                      days[value.toInt()],
+                                      days[intIndex],
                                       style: GoogleFonts.poppins(fontSize: 10),
                                     ),
                                   );
@@ -2411,7 +2562,7 @@ class AnalyticsPanel extends StatelessWidget {
                         borderData: FlBorderData(show: false),
                         lineBarsData: [
                           LineChartBarData(
-                            spots: provider.performanceSpots,
+                            spots: studySpots,
                             isCurved: true,
                             color: kPrimaryColor,
                             barWidth: 3,
@@ -2421,11 +2572,19 @@ class AnalyticsPanel extends StatelessWidget {
                               color: kPrimaryColor.withOpacity(0.2),
                             ),
                           ),
+                          LineChartBarData(
+                            spots: focusSpots,
+                            isCurved: true,
+                            color: kSecondaryColor,
+                            barWidth: 2,
+                            dotData: FlDotData(show: true),
+                            belowBarData: BarAreaData(show: false),
+                          ),
                         ],
                         minX: 0,
-                        maxX: 6,
+                        maxX: (provider.studyHours.length - 1).toDouble(),
                         minY: 0,
-                        maxY: 6,
+                        maxY: provider.maxGraphValue,
                       ),
                     );
                   },
@@ -2436,76 +2595,7 @@ class AnalyticsPanel extends StatelessWidget {
         ),
         
         const SizedBox(height: 16),
-        
-        // Recommended Resources
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: kWhiteColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Recommended Resources',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: kDarkTextColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Consumer<StudyDataProvider>(builder: (context, provider, _) {
-                try {
-                  final resources = provider.resources;
-                  if (resources.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        'No recommended resources available.',
-                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
-                      ),
-                    );
-                  }
-                  return Column(
-                    children: resources.map((r) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: InkWell(
-                          onTap: () async {
-                            try {
-                              await provider.launchLink(r.url);
-                            } catch (_) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${r.title}')));
-                            }
-                          },
-                          child: _buildResourceItemFromResource(r),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                } catch (e) {
-                  debugPrint('Error building resources list: $e');
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Text(
-                      'Unable to load recommended resources.',
-                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
-                    ),
-                  );
-                }
-              }),
-            ],
-          ),
-        ),
+        // Recommended Resources moved to bottom as ResourcesCard for mobile
       ],
     );
   }
@@ -2548,7 +2638,7 @@ class AnalyticsPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildResourceItemFromResource(StudyResource r) {
+  Widget _buildResourceItemFromResource(BuildContext context, StudyResource r) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -2567,18 +2657,116 @@ class AnalyticsPanel extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(r.title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: kDarkTextColor)),
-                const SizedBox(height: 4),
-                Text(r.subtitle, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
-              ],
+            child: InkWell(
+              onTap: () async {
+                try {
+                  await Provider.of<StudyDataProvider>(context, listen: false).launchLink(r.url);
+                } catch (_) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${r.title}')));
+                }
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: kDarkTextColor)),
+                  const SizedBox(height: 4),
+                  Text(r.subtitle, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
             ),
           ),
-          Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          InkWell(
+            onTap: () async {
+              try {
+                await Provider.of<StudyDataProvider>(context, listen: false).launchLink(r.url);
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${r.title}')));
+              }
+            },
+            child: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+          ),
         ],
       ),
     );
   }
 }
+
+// ============================================================================
+// RESOURCES CARD (mobile full-width)
+// ============================================================================
+class ResourcesCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<StudyDataProvider>(builder: (context, provider, _) {
+      final resources = provider.resources;
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: kWhiteColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Recommended Resources', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: kDarkTextColor)),
+            const SizedBox(height: 16),
+            if (resources.isEmpty)
+              Text('No recommended resources available.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]))
+            else
+              Column(
+                children: resources.map((r) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: InkWell(
+                      onTap: () async {
+                        try {
+                          await provider.launchLink(r.url);
+                        } catch (_) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open ${r.title}')));
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: r.color.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(color: r.color, borderRadius: BorderRadius.circular(8)),
+                              child: Icon(r.icon, color: kWhiteColor, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(r.title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: kDarkTextColor)),
+                                const SizedBox(height: 4),
+                                Text(r.subtitle, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+                              ]),
+                            ),
+                            Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+
+
