@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 // Ensure you have these files in your project, or remove imports if unused
-import 'shared.dart';
+// shared.dart removed from this file to avoid unused-import issues
 import 'auth.dart';
 
 // ==========================================
@@ -110,10 +110,12 @@ class Post {
       category,
       postType,
       location,
-      phone;
+      phone,
+      uniId;
   final datePublished;
 
   Post({
+    required this.uniId,
     required this.category,
     required this.postType,
     required this.location,
@@ -139,6 +141,7 @@ class Post {
         'postType': postType,
         'location': location,
         'phone': phone,
+        'uniId': uniId,
       };
 }
 
@@ -155,6 +158,7 @@ class FirestoreMethods {
     String location,
     String postType,
     String phone,
+    String uniId,
   ) async {
     try {
       String base64Image = base64Encode(file);
@@ -171,9 +175,21 @@ class FirestoreMethods {
         postType: postType,
         title: title,
         phone: phone,
+        uniId: uniId,
       );
 
+      // Write to root mirror collection for admin/global queries
       await _firestore.collection('posts').doc(postId).set(post.toJson());
+
+      // Also write under the university-specific lost_and_found collection
+      if (uniId.isNotEmpty) {
+        await _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('lost_and_found')
+            .doc(postId)
+            .set(post.toJson());
+      }
       return "Success";
     } catch (e) {
       return e.toString();
@@ -181,7 +197,26 @@ class FirestoreMethods {
   }
 
   Future<void> deletePost(String postId) async {
-    await _firestore.collection('posts').doc(postId).delete();
+    // Delete from root posts and from the university subcollection if present.
+    final rootRef = _firestore.collection('posts').doc(postId);
+    final doc = await rootRef.get();
+    String uniId = '';
+    if (doc.exists) {
+      final Map<String, dynamic>? _d = doc.data() as Map<String, dynamic>?;
+      uniId = _d?['uniId'] ?? '';
+    }
+
+    final batch = _firestore.batch();
+    batch.delete(rootRef);
+    if (uniId.isNotEmpty) {
+      final uniRef = _firestore
+          .collection('universities')
+          .doc(uniId)
+          .collection('lost_and_found')
+          .doc(postId);
+      batch.delete(uniRef);
+    }
+    await batch.commit();
   }
 
   Future<String> updatePost(
@@ -193,13 +228,37 @@ class FirestoreMethods {
     String phone,
   ) async {
     try {
-      await _firestore.collection('posts').doc(postId).update({
+      final rootRef = _firestore.collection('posts').doc(postId);
+      final doc = await rootRef.get();
+      String uniId = '';
+      if (doc.exists) {
+        final Map<String, dynamic>? _d = doc.data() as Map<String, dynamic>?;
+        uniId = _d?['uniId'] ?? '';
+      }
+
+      final batch = _firestore.batch();
+      batch.update(rootRef, {
         'title': title,
         'description': description,
         'location': location,
         'category': category,
         'phone': phone,
       });
+      if (uniId.isNotEmpty) {
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('lost_and_found')
+            .doc(postId);
+        batch.update(uniRef, {
+          'title': title,
+          'description': description,
+          'location': location,
+          'category': category,
+          'phone': phone,
+        });
+      }
+      await batch.commit();
       return "Success";
     } catch (e) {
       return e.toString();
@@ -705,6 +764,9 @@ class PostsListView extends StatefulWidget {
 
 class _PostsListViewState extends State<PostsListView> {
   final TextEditingController _searchCtrl = TextEditingController();
+  String uniId = '';
+  String currentUserUid = '';
+  String currentUserRole = 'student';
   String selectedCategory = 'All';
   String selectedType = 'All';
   bool sortByEarliest = false;
@@ -720,6 +782,26 @@ class _PostsListViewState extends State<PostsListView> {
     if (widget.initialSearch != null) {
       _searchCtrl.text = widget.initialSearch!;
     }
+    // load current user's university id for scoping posts
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = AuthService().currentUser;
+      if (user != null) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          final Map<String, dynamic>? _d = doc.data() as Map<String, dynamic>?;
+          setState(() {
+            uniId = _d?['uniId'] ?? '';
+            currentUserUid = user.uid;
+            currentUserRole = _d?['role'] ?? 'student';
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
   }
 
   String _timeAgo(DateTime date) {
@@ -1006,193 +1088,212 @@ class _PostsListViewState extends State<PostsListView> {
                     const SizedBox(height: 16),
                     // List
                     Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('posts')
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
-                          if (!snapshot.hasData ||
-                              snapshot.data!.docs.isEmpty) {
-                            return const Center(
-                              child: Text('No items found',
-                                  style: TextStyle(color: Colors.grey)),
-                            );
-                          }
+                      child: uniId.isEmpty
+                          ? const Center(child: CircularProgressIndicator())
+                          : StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('posts')
+                                  .where('uniId', isEqualTo: uniId)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Center(
+                                      child: CircularProgressIndicator());
+                                }
+                                if (!snapshot.hasData ||
+                                    snapshot.data!.docs.isEmpty) {
+                                  return const Center(
+                                    child: Text('No items found',
+                                        style: TextStyle(color: Colors.grey)),
+                                  );
+                                }
 
-                          List<QueryDocumentSnapshot> docs =
-                              snapshot.data!.docs;
-                          List<QueryDocumentSnapshot> filtered =
-                              docs.where((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            // Normalize category values for robust matching
-                            final docCategory = (data['category'] ?? '')
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-                            final selCategory = selectedCategory
-                                .toString()
-                                .trim()
-                                .toLowerCase();
-                            if (selCategory != 'all' &&
-                                docCategory != selCategory) {
-                              return false;
-                            }
-                            if (selectedType != 'All' &&
-                                (data['postType'] ?? 'Found') != selectedType) {
-                              return false;
-                            }
-                            if (!_matchesSearch(data, _searchCtrl.text)) {
-                              return false;
-                            }
-                            return true;
-                          }).toList();
+                                List<QueryDocumentSnapshot> docs =
+                                    snapshot.data!.docs;
+                                List<QueryDocumentSnapshot> filtered =
+                                    docs.where((doc) {
+                                  final data =
+                                      doc.data() as Map<String, dynamic>;
+                                  // Normalize category values for robust matching
+                                  final docCategory = (data['category'] ?? '')
+                                      .toString()
+                                      .trim()
+                                      .toLowerCase();
+                                  final selCategory = selectedCategory
+                                      .toString()
+                                      .trim()
+                                      .toLowerCase();
+                                  if (selCategory != 'all' &&
+                                      docCategory != selCategory) {
+                                    return false;
+                                  }
+                                  if (selectedType != 'All' &&
+                                      (data['postType'] ?? 'Found') !=
+                                          selectedType) {
+                                    return false;
+                                  }
+                                  if (!_matchesSearch(data, _searchCtrl.text)) {
+                                    return false;
+                                  }
+                                  return true;
+                                }).toList();
 
-                          filtered.sort((a, b) {
-                            DateTime da, db;
-                            final A = a.data() as Map<String, dynamic>;
-                            final B = b.data() as Map<String, dynamic>;
-                            final ta = A['datePublished'];
-                            final tb = B['datePublished'];
-                            if (ta is Timestamp) {
-                              da = ta.toDate();
-                            } else if (ta is DateTime) {
-                              da = ta;
-                            } else {
-                              da = DateTime.tryParse(ta.toString()) ??
-                                  DateTime.now();
-                            }
-                            if (tb is Timestamp) {
-                              db = tb.toDate();
-                            } else if (tb is DateTime) {
-                              db = tb;
-                            } else {
-                              db = DateTime.tryParse(tb.toString()) ??
-                                  DateTime.now();
-                            }
-                            return sortByEarliest
-                                ? da.compareTo(db)
-                                : db.compareTo(da);
-                          });
+                                filtered.sort((a, b) {
+                                  DateTime da, db;
+                                  final A = a.data() as Map<String, dynamic>;
+                                  final B = b.data() as Map<String, dynamic>;
+                                  final ta = A['datePublished'];
+                                  final tb = B['datePublished'];
+                                  if (ta is Timestamp) {
+                                    da = ta.toDate();
+                                  } else if (ta is DateTime) {
+                                    da = ta;
+                                  } else {
+                                    da = DateTime.tryParse(ta.toString()) ??
+                                        DateTime.now();
+                                  }
+                                  if (tb is Timestamp) {
+                                    db = tb.toDate();
+                                  } else if (tb is DateTime) {
+                                    db = tb;
+                                  } else {
+                                    db = DateTime.tryParse(tb.toString()) ??
+                                        DateTime.now();
+                                  }
+                                  return sortByEarliest
+                                      ? da.compareTo(db)
+                                      : db.compareTo(da);
+                                });
 
-                          if (filtered.isEmpty) {
-                            return const Center(
-                              child: Text('No items match filters',
-                                  style: TextStyle(color: Colors.grey)),
-                            );
-                          }
+                                if (filtered.isEmpty) {
+                                  return const Center(
+                                    child: Text('No items match filters',
+                                        style: TextStyle(color: Colors.grey)),
+                                  );
+                                }
 
-                          return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 0.75,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
+                                return GridView.builder(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.75,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                  ),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, index) {
+                                    final doc = filtered[index];
+                                    final Map<String, dynamic>? data =
+                                        doc.data() as Map<String, dynamic>?;
+
+                                    DateTime date;
+                                    final ts = data?['datePublished'];
+                                    if (ts is Timestamp) {
+                                      date = ts.toDate();
+                                    } else if (ts is DateTime) {
+                                      date = ts;
+                                    } else {
+                                      date = DateTime.tryParse(ts.toString()) ??
+                                          DateTime.now();
+                                    }
+
+                                    final postType =
+                                        data?['postType'] ?? 'Found';
+                                    final isLost = postType == 'Lost';
+
+                                    return GestureDetector(
+                                      onTap: () => Get.to(
+                                          () => PostDetailView(snap: doc)),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(16),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withOpacity(0.06),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  const BorderRadius.vertical(
+                                                top: Radius.circular(16),
+                                              ),
+                                              child: SmartImageDisplay(
+                                                imageData:
+                                                    data?['postUrl'] ?? '',
+                                                width: double.infinity,
+                                                height: 140,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(12),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      data?['title'] ??
+                                                          'No title',
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            Color(0xFF1A1A1A),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      postType,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        color: isLost
+                                                            ? const Color(
+                                                                0xFFE53935)
+                                                            : const Color(
+                                                                0xFF43A047),
+                                                      ),
+                                                    ),
+                                                    const Spacer(),
+                                                    Text(
+                                                      _timeAgo(date),
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              final doc = filtered[index];
-                              final data = doc.data() as Map<String, dynamic>;
-
-                              DateTime date;
-                              final ts = data['datePublished'];
-                              if (ts is Timestamp) {
-                                date = ts.toDate();
-                              } else if (ts is DateTime) {
-                                date = ts;
-                              } else {
-                                date = DateTime.tryParse(ts.toString()) ??
-                                    DateTime.now();
-                              }
-
-                              final postType = data['postType'] ?? 'Found';
-                              final isLost = postType == 'Lost';
-
-                              return GestureDetector(
-                                onTap: () =>
-                                    Get.to(() => PostDetailView(snap: doc)),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.06),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                          top: Radius.circular(16),
-                                        ),
-                                        child: SmartImageDisplay(
-                                          imageData: data['postUrl'] ?? '',
-                                          width: double.infinity,
-                                          height: 140,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                data['title'] ?? 'No title',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF1A1A1A),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                postType,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: isLost
-                                                      ? const Color(0xFFE53935)
-                                                      : const Color(0xFF43A047),
-                                                ),
-                                              ),
-                                              const Spacer(),
-                                              Text(
-                                                _timeAgo(date),
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
                     ),
                   ],
                 ),
@@ -1258,6 +1359,18 @@ class _CreatePostViewState extends State<CreatePostView> {
     try {
       var user = AuthService().currentUser!;
       String name = await AuthService().getName();
+      // fetch user's university id from users collection
+      String uniId = '';
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final Map<String, dynamic>? _d = doc.data() as Map<String, dynamic>?;
+        uniId = _d?['uniId'] ?? '';
+      } catch (e) {
+        uniId = '';
+      }
       String formattedPhone = PhoneValidator.formatPhone(_phone.text);
       String res = await FirestoreMethods().uploadPost(
         _desc.text,
@@ -1269,6 +1382,7 @@ class _CreatePostViewState extends State<CreatePostView> {
         _location.text,
         postType,
         formattedPhone,
+        uniId,
       );
       setState(() => isLoading = false);
       if (res == "Success") {
@@ -1574,14 +1688,47 @@ class _CreatePostViewState extends State<CreatePostView> {
 // POST DETAIL VIEW
 // ==========================================
 
-class PostDetailView extends StatelessWidget {
+class PostDetailView extends StatefulWidget {
   final dynamic snap;
   const PostDetailView({super.key, required this.snap});
 
   @override
+  State<PostDetailView> createState() => _PostDetailViewState();
+}
+
+class _PostDetailViewState extends State<PostDetailView> {
+  String currentUserUid = '';
+  String currentUserRole = 'student';
+  String currentUserUni = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService().currentUser;
+    if (user != null) {
+      currentUserUid = user.uid;
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get()
+          .then((doc) {
+        final Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
+        setState(() {
+          currentUserRole = data?['role'] ?? 'student';
+          currentUserUni = data?['uniId'] ?? '';
+        });
+      }).catchError((_) {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    var currentUser = AuthService().currentUser;
-    bool isOwner = currentUser?.uid == snap['uid'];
+    final snap = widget.snap;
+    var isOwner = currentUserUid.isNotEmpty && currentUserUid == snap['uid'];
+    final postUni = (snap['uniId'] ?? '').toString();
+    final canEditOrDelete = isOwner ||
+        currentUserRole == 'super_admin' ||
+        (currentUserRole == 'uni_admin' && postUni == currentUserUni);
 
     return Scaffold(
       backgroundColor: const Color(0xFF2D1B69),
@@ -1617,7 +1764,7 @@ class PostDetailView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (isOwner)
+                  if (canEditOrDelete)
                     PopupMenuButton(
                       icon: const Icon(Icons.more_vert, color: Colors.white),
                       itemBuilder: (context) => [
@@ -1810,7 +1957,7 @@ class PostDetailView extends StatelessWidget {
             onPressed: () async {
               Get.back();
               try {
-                await FirestoreMethods().deletePost(snap['postId']);
+                await FirestoreMethods().deletePost(widget.snap['postId']);
                 Get.back();
                 Get.snackbar("Success", "Post deleted",
                     snackPosition: SnackPosition.BOTTOM,
@@ -2305,67 +2452,114 @@ class ProfileView extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    trailing: PopupMenuButton<String>(
-                                      onSelected: (v) async {
-                                        if (v == 'edit') {
-                                          Get.to(() => EditPostView(snap: doc));
-                                        } else if (v == 'delete') {
-                                          final confirmed =
-                                              await Get.dialog<bool>(
-                                            AlertDialog(
-                                              title: const Text('Delete Post'),
-                                              content: const Text(
-                                                'Are you sure you want to delete this post?',
-                                              ),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Get.back(result: false),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () =>
-                                                      Get.back(result: true),
-                                                  child: const Text(
-                                                    'Delete',
-                                                    style: TextStyle(
-                                                        color: Colors.red),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                          if (confirmed == true) {
-                                            try {
-                                              await FirestoreMethods()
-                                                  .deletePost(
-                                                data['postId'] ?? doc.id,
-                                              );
-                                              Get.snackbar(
-                                                  'Success', 'Post deleted',
-                                                  snackPosition:
-                                                      SnackPosition.BOTTOM,
-                                                  backgroundColor:
-                                                      Colors.green.shade100);
-                                            } catch (e) {
-                                              Get.snackbar('Error',
-                                                  'Failed to delete: $e',
-                                                  snackPosition:
-                                                      SnackPosition.BOTTOM,
-                                                  backgroundColor:
-                                                      Colors.red.shade100);
-                                            }
-                                          }
+                                    trailing: FutureBuilder<DocumentSnapshot?>(
+                                      future: () async {
+                                        final user = AuthService().currentUser;
+                                        if (user == null) return null;
+                                        try {
+                                          return await FirebaseFirestore
+                                              .instance
+                                              .collection('users')
+                                              .doc(user.uid)
+                                              .get();
+                                        } catch (e) {
+                                          return null;
                                         }
+                                      }(),
+                                      builder: (context, usrSnap) {
+                                        final postOwner =
+                                            (data['uid'] ?? '').toString();
+                                        final postUni =
+                                            (data['uniId'] ?? '').toString();
+
+                                        final currentUserUid =
+                                            AuthService().currentUser?.uid ??
+                                                '';
+                                        final usrData = usrSnap.data?.data()
+                                            as Map<String, dynamic>?;
+                                        final currentUserRole =
+                                            usrData?['role'] ?? 'student';
+                                        final currentUserUni =
+                                            usrData?['uniId'] ?? '';
+
+                                        final canEditOrDelete = currentUserUid
+                                                .isNotEmpty &&
+                                            (currentUserUid == postOwner ||
+                                                currentUserRole ==
+                                                    'super_admin' ||
+                                                (currentUserRole ==
+                                                        'uni_admin' &&
+                                                    postUni == currentUserUni));
+
+                                        if (!canEditOrDelete)
+                                          return const SizedBox.shrink();
+
+                                        return PopupMenuButton<String>(
+                                          onSelected: (v) async {
+                                            if (v == 'edit') {
+                                              Get.to(() =>
+                                                  EditPostView(snap: doc));
+                                            } else if (v == 'delete') {
+                                              final confirmed =
+                                                  await Get.dialog<bool>(
+                                                AlertDialog(
+                                                  title:
+                                                      const Text('Delete Post'),
+                                                  content: const Text(
+                                                    'Are you sure you want to delete this post?',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Get.back(
+                                                          result: false),
+                                                      child:
+                                                          const Text('Cancel'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () => Get.back(
+                                                          result: true),
+                                                      child: const Text(
+                                                        'Delete',
+                                                        style: TextStyle(
+                                                            color: Colors.red),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              if (confirmed == true) {
+                                                try {
+                                                  await FirestoreMethods()
+                                                      .deletePost(
+                                                          data['postId'] ??
+                                                              doc.id);
+                                                  Get.snackbar(
+                                                      'Success', 'Post deleted',
+                                                      snackPosition:
+                                                          SnackPosition.BOTTOM,
+                                                      backgroundColor: Colors
+                                                          .green.shade100);
+                                                } catch (e) {
+                                                  Get.snackbar('Error',
+                                                      'Failed to delete: $e',
+                                                      snackPosition:
+                                                          SnackPosition.BOTTOM,
+                                                      backgroundColor:
+                                                          Colors.red.shade100);
+                                                }
+                                              }
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                                value: 'edit',
+                                                child: Text('Edit')),
+                                            const PopupMenuItem(
+                                                value: 'delete',
+                                                child: Text('Delete')),
+                                          ],
+                                        );
                                       },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                            value: 'edit', child: Text('Edit')),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Text('Delete'),
-                                        ),
-                                      ],
                                     ),
                                   ),
                                 ),

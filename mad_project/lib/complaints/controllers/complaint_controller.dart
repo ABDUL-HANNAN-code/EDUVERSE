@@ -1,7 +1,12 @@
 // lib/complaints/controllers/complaint_controller.dart
 
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/complaint_model.dart';
 import '../services/complaint_service.dart';
 
@@ -11,6 +16,7 @@ class ComplaintController extends GetxController {
   final complaints = <ComplaintModel>[].obs;
   final isLoading = false.obs;
   final statistics = <String, int>{}.obs;
+  StreamSubscription<List<ComplaintModel>>? _studentSub;
 
   // Form controllers
   final titleController = TextEditingController();
@@ -30,25 +36,83 @@ class ComplaintController extends GetxController {
   void onClose() {
     titleController.dispose();
     descriptionController.dispose();
+    _studentSub?.cancel();
     super.onClose();
   }
 
   void loadStudentComplaints() {
     isLoading.value = true;
-    _service.getStudentComplaints().listen(
+
+    // Cancel any existing subscription to avoid duplicates on reload/login
+    _studentSub?.cancel();
+
+    _studentSub = _service.getStudentComplaints().listen(
       (data) {
         complaints.value = data;
         isLoading.value = false;
       },
-      onError: (error) {
+      onError: (error) async {
         isLoading.value = false;
+        print('ComplaintController: error loading student complaints: $error');
+
+        String message = 'Failed to load complaints';
+        if (error is FirebaseException) {
+          message = '${message}: ${error.message}';
+          final msg = error.message ?? '';
+          final urlMatch =
+              RegExp(r'(https?:\/\/\S*indexes?\S*)').firstMatch(msg);
+          if (urlMatch != null) {
+            final url = urlMatch.group(0)!;
+            // Offer to open index creation page for developers/admins.
+            Get.defaultDialog(
+              title: 'Index Required',
+              middleText:
+                  'A Firestore composite index may be required for your complaints query. Open the console to create it?',
+              textConfirm: 'Open Index',
+              onConfirm: () async {
+                Get.back();
+                try {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    Get.snackbar('Error', 'Cannot open browser for index link',
+                        snackPosition: SnackPosition.BOTTOM);
+                  }
+                } catch (e) {
+                  Get.snackbar('Error', 'Failed to open index link: $e',
+                      snackPosition: SnackPosition.BOTTOM);
+                }
+              },
+              textCancel: 'Cancel',
+            );
+          }
+        } else if (error != null) {
+          message = '${message}: $error';
+        }
+
         Get.snackbar(
           'Error',
-          'Failed to load complaints',
+          message,
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.shade100,
           colorText: Colors.red.shade900,
         );
+
+        // Try a lightweight fallback fetch that avoids composite index need.
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final fallback = await _service.getStudentComplaintsFallback(
+              studentId: user.uid, limit: 20);
+          if (fallback.isNotEmpty) {
+            print(
+                'ComplaintController: fallback returned ${fallback.length} complaints');
+            complaints.value = fallback;
+            Get.snackbar(
+                'Notice', 'Showing recent complaints while index builds',
+                snackPosition: SnackPosition.BOTTOM);
+          }
+        }
       },
     );
   }

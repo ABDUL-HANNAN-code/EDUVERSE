@@ -41,7 +41,8 @@ class AdminComplaintController extends GetxController {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       isLoading.value = false;
-      Get.snackbar('Error', 'Not authenticated', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Error', 'Not authenticated',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
@@ -52,7 +53,8 @@ class AdminComplaintController extends GetxController {
       uniId = selectedUniId.value;
     } else {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final doc =
+            await FirebaseFirestore.instance.collection('users').doc(uid).get();
         final data = doc.data() ?? {};
         uniId = data['uniId'] ?? '';
         deptId = data['departmentId'] ?? '';
@@ -66,12 +68,15 @@ class AdminComplaintController extends GetxController {
       // multiple listeners and stale state after reload/login).
       await _complaintSub?.cancel();
 
-      print('AdminComplaintController: loading complaints for uid=$uid uniId="$uniId" deptId="$deptId" filter=${currentFilter.value}');
+      print(
+          'AdminComplaintController: loading complaints for uid=$uid uniId="$uniId" deptId="$deptId" filter=${currentFilter.value}');
 
       _complaintSub = _service
-          .getAdminComplaints(uniId: uniId, deptId: deptId, statusFilter: currentFilter.value)
+          .getAdminComplaints(
+              uniId: uniId, deptId: deptId, statusFilter: currentFilter.value)
           .listen((dataList) {
-        print('AdminComplaintController: received ${dataList.length} complaints');
+        print(
+            'AdminComplaintController: received ${dataList.length} complaints');
         complaints.value = dataList;
         isLoading.value = false;
       }, onError: (error) {
@@ -83,13 +88,15 @@ class AdminComplaintController extends GetxController {
           // If Firestore indicates an index is required, extract the URL and
           // offer to open it in the browser so the developer can create it.
           final msg = error.message ?? '';
-            final urlMatch = RegExp(r'(https?:\/\/\S*indexes?\S*)').firstMatch(msg);
+          final urlMatch =
+              RegExp(r'(https?:\/\/\S*indexes?\S*)').firstMatch(msg);
           if (urlMatch != null) {
             final url = urlMatch.group(0)!;
             print('AdminComplaintController: index URL detected: $url');
             Get.defaultDialog(
               title: 'Index Required',
-              middleText: 'A Firestore composite index is required to run this query. Open the console to create it?',
+              middleText:
+                  'A Firestore composite index is required to run this query. Open the console to create it?',
               textConfirm: 'Open Index',
               onConfirm: () async {
                 Get.back();
@@ -98,10 +105,12 @@ class AdminComplaintController extends GetxController {
                   if (await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   } else {
-                    Get.snackbar('Error', 'Cannot open browser for index link', snackPosition: SnackPosition.BOTTOM);
+                    Get.snackbar('Error', 'Cannot open browser for index link',
+                        snackPosition: SnackPosition.BOTTOM);
                   }
                 } catch (e) {
-                  Get.snackbar('Error', 'Failed to open index link: $e', snackPosition: SnackPosition.BOTTOM);
+                  Get.snackbar('Error', 'Failed to open index link: $e',
+                      snackPosition: SnackPosition.BOTTOM);
                 }
               },
               textCancel: 'Cancel',
@@ -110,15 +119,21 @@ class AdminComplaintController extends GetxController {
         } else if (error != null) {
           message = '${message}: $error';
         }
-        Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.shade100, colorText: Colors.red.shade900);
+        Get.snackbar('Error', message,
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red.shade100,
+            colorText: Colors.red.shade900);
 
         // Attempt a lightweight fallback fetch (recent complaints) so the
         // admin sees something while an index is created or building.
         _service.getRecentComplaintsFallback(limit: 20).then((fallbackList) {
           if (fallbackList.isNotEmpty) {
-            print('AdminComplaintController: fallback returned ${fallbackList.length} complaints');
+            print(
+                'AdminComplaintController: fallback returned ${fallbackList.length} complaints');
             complaints.value = fallbackList;
-            Get.snackbar('Notice', 'Showing recent complaints while index builds', snackPosition: SnackPosition.BOTTOM);
+            Get.snackbar(
+                'Notice', 'Showing recent complaints while index builds',
+                snackPosition: SnackPosition.BOTTOM);
           } else {
             print('AdminComplaintController: fallback returned no complaints');
           }
@@ -127,7 +142,10 @@ class AdminComplaintController extends GetxController {
     } catch (e) {
       isLoading.value = false;
       print('AdminComplaintController: exception in loadComplaints: $e');
-      Get.snackbar('Error', 'Failed to load complaints: $e', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.shade100, colorText: Colors.red.shade900);
+      Get.snackbar('Error', 'Failed to load complaints: $e',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100,
+          colorText: Colors.red.shade900);
     }
   }
 
@@ -314,7 +332,8 @@ class AdminComplaintController extends GetxController {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF667EEA), width: 2),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF667EEA), width: 2),
                 ),
               ),
             ),

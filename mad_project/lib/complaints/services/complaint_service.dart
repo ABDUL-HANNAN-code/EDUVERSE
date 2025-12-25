@@ -27,7 +27,8 @@ class ComplaintService {
 
       // Basic validation: ensure university and department are provided
       if (uniId.isEmpty || deptId.isEmpty) {
-        throw Exception('Missing university or department information in user profile. Please update your profile.');
+        throw Exception(
+            'Missing university or department information in user profile. Please update your profile.');
       }
 
       final complaint = ComplaintModel(
@@ -47,7 +48,11 @@ class ComplaintService {
       try {
         // Create in a batch: write to root collection and mirror under universities/{uniId}/complaints
         final docRef = _firestore.collection(_collectionName).doc();
-        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(docRef.id);
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('complaints')
+            .doc(docRef.id);
 
         final data = complaint.toFirestore();
 
@@ -59,7 +64,8 @@ class ComplaintService {
         return docRef.id;
       } on FirebaseException catch (fe) {
         if (fe.code == 'permission-denied') {
-          throw Exception('Permission denied when creating complaint. Check Firestore security rules and ensure authenticated users are allowed to create complaints. (${fe.message})');
+          throw Exception(
+              'Permission denied when creating complaint. Check Firestore security rules and ensure authenticated users are allowed to create complaints. (${fe.message})');
         }
         rethrow;
       }
@@ -75,11 +81,13 @@ class ComplaintService {
 
     // Read from root collection where studentId == uid
     return _firestore
-      .collection(_collectionName)
-      .where('studentId', isEqualTo: user.uid)
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList());
+        .collection(_collectionName)
+        .where('studentId', isEqualTo: user.uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ComplaintModel.fromFirestore(doc))
+            .toList());
   }
 
   // Get all complaints for admin (filtered by university and department)
@@ -104,23 +112,51 @@ class ComplaintService {
       query = query.where('status', isEqualTo: statusFilter.name);
     }
 
-    return query.orderBy('createdAt', descending: true).snapshots().map((snapshot) => snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList());
+    return query.orderBy('createdAt', descending: true).snapshots().map(
+        (snapshot) => snapshot.docs
+            .map((doc) => ComplaintModel.fromFirestore(doc))
+            .toList());
   }
 
   // Fallback: fetch a small set of recent complaints without composite filters.
   // Useful when composite index is missing or building — returns an empty
   // list on failure so callers can gracefully handle it.
-  Future<List<ComplaintModel>> getRecentComplaintsFallback({int limit = 20}) async {
+  Future<List<ComplaintModel>> getRecentComplaintsFallback(
+      {int limit = 20}) async {
     try {
-      final snapshot = await _firestore.collection(_collectionName)
+      final snapshot = await _firestore
+          .collection(_collectionName)
           .orderBy('createdAt', descending: true)
           .limit(limit)
           .get();
 
-      return snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ComplaintModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       // Log and return empty so UI can decide what to show.
       print('ComplaintService: fallback fetch failed: $e');
+      return [];
+    }
+  }
+
+  // Fallback: fetch recent complaints for a specific student without ordering
+  // that could require a composite index. This helps student view when the
+  // ordered snapshots query fails due to missing composite index.
+  Future<List<ComplaintModel>> getStudentComplaintsFallback(
+      {required String studentId, int limit = 20}) async {
+    try {
+      final snapshot = await _firestore
+          .collection(_collectionName)
+          .where('studentId', isEqualTo: studentId)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => ComplaintModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('ComplaintService: student fallback fetch failed: $e');
       return [];
     }
   }
@@ -138,10 +174,20 @@ class ComplaintService {
       final uniId = doc.data()?['uniId'] ?? '';
 
       final batch = _firestore.batch();
-      batch.update(rootRef, {'status': newStatus.name, 'updatedAt': FieldValue.serverTimestamp()});
+      batch.update(rootRef, {
+        'status': newStatus.name,
+        'updatedAt': FieldValue.serverTimestamp()
+      });
       if (uniId != '') {
-        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
-        batch.update(uniRef, {'status': newStatus.name, 'updatedAt': FieldValue.serverTimestamp()});
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('complaints')
+            .doc(complaintId);
+        batch.update(uniRef, {
+          'status': newStatus.name,
+          'updatedAt': FieldValue.serverTimestamp()
+        });
       }
       await batch.commit();
     } catch (e) {
@@ -161,10 +207,16 @@ class ComplaintService {
       final uniId = doc.data()?['uniId'] ?? '';
 
       final batch = _firestore.batch();
-      batch.update(rootRef, {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      batch.update(rootRef,
+          {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
       if (uniId != '') {
-        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
-        batch.update(uniRef, {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('complaints')
+            .doc(complaintId);
+        batch.update(uniRef,
+            {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
       }
       await batch.commit();
     } catch (e) {
@@ -185,10 +237,22 @@ class ComplaintService {
       final uniId = doc.data()?['uniId'] ?? '';
 
       final batch = _firestore.batch();
-      batch.update(rootRef, {'status': newStatus.name, 'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+      batch.update(rootRef, {
+        'status': newStatus.name,
+        'adminReply': reply,
+        'updatedAt': FieldValue.serverTimestamp()
+      });
       if (uniId != '') {
-        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
-        batch.update(uniRef, {'status': newStatus.name, 'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('complaints')
+            .doc(complaintId);
+        batch.update(uniRef, {
+          'status': newStatus.name,
+          'adminReply': reply,
+          'updatedAt': FieldValue.serverTimestamp()
+        });
       }
       await batch.commit();
     } catch (e) {
@@ -247,7 +311,11 @@ class ComplaintService {
       final batch = _firestore.batch();
       batch.delete(rootRef);
       if (uniId != '') {
-        final uniRef = _firestore.collection('universities').doc(uniId).collection('complaints').doc(complaintId);
+        final uniRef = _firestore
+            .collection('universities')
+            .doc(uniId)
+            .collection('complaints')
+            .doc(complaintId);
         batch.delete(uniRef);
       }
       await batch.commit();

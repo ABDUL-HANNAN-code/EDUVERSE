@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
+import '../lost_and_found_admin.dart';
 // Poster manager removed from admin dashboard per UX request
 
 class AdminDashboard extends StatefulWidget {
@@ -104,7 +105,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       isLoadingProfile = false;
     });
 
-    final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 1 : 0);
+    final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 2 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
     // Ensure UI updates (FAB visibility) when the selected tab changes
     _tabController.addListener(() {
@@ -183,6 +184,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                 icon: Icon(Icons.store_mall_directory),
                 text: 'Manage Marketplaces',
               ),
+            if (isSuperAdmin || isUniversityAdmin)
+              const Tab(
+                icon: Icon(Icons.find_in_page),
+                text: 'Lost & Found',
+              ),
           ],
         ),
       ),
@@ -193,6 +199,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           _buildGridTimetable(),
           _buildUserManager(),
           if (isSuperAdmin || isUniversityAdmin) const MarketplaceAdminList(),
+          if (isSuperAdmin || isUniversityAdmin)
+            LostAndFoundAdminList(adminViewUniId: selectedUni),
         ],
       ),
       floatingActionButton: _tabController.index == 0
