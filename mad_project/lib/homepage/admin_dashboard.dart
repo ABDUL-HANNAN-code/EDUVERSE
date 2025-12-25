@@ -51,7 +51,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     'Wednesday',
     'Thursday',
     'Friday',
-    'Saturday'
+    // Saturday removed (off)
   ];
 
   @override
@@ -179,7 +179,10 @@ class _AdminDashboardState extends State<AdminDashboard>
             const Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
             const Tab(icon: Icon(Icons.people), text: "Manage Users"),
             if (isSuperAdmin || isUniversityAdmin)
-              const Tab(icon: Icon(Icons.store_mall_directory), text: 'Manage Marketplaces'),
+              const Tab(
+                icon: Icon(Icons.store_mall_directory),
+                text: 'Manage Marketplaces',
+              ),
           ],
         ),
       ),
@@ -220,8 +223,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                 colors: isSuperAdmin
                     ? [Colors.purple, Colors.deepPurple]
                     : (isUniversityAdmin
-                        ? [Colors.indigo, Colors.blue]
-                        : [Colors.teal, Colors.cyan]),
+                          ? [Colors.indigo, Colors.blue]
+                          : [Colors.teal, Colors.cyan]),
               ),
             ),
             child: Padding(
@@ -235,7 +238,9 @@ class _AdminDashboardState extends State<AdminDashboard>
                     child: Text(
                       userName.isNotEmpty ? userName[0].toUpperCase() : 'A',
                       style: const TextStyle(
-                          fontSize: 28, fontWeight: FontWeight.bold),
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -251,8 +256,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                     isSuperAdmin
                         ? 'Super Admin'
                         : (isUniversityAdmin
-                            ? 'University Admin'
-                            : 'Department Admin'),
+                              ? 'University Admin'
+                              : 'Department Admin'),
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ],
@@ -273,21 +278,31 @@ class _AdminDashboardState extends State<AdminDashboard>
           // University Selector
           if (isSuperAdmin)
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8,
+              ),
               child: DropdownButtonFormField<String?>(
                 value: selectedUni,
                 decoration: const InputDecoration(
                   labelText: "University",
                   border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
                 items: [
                   const DropdownMenuItem<String?>(
-                      value: null, child: Text("Select University")),
-                  ...universities.map((u) => DropdownMenuItem<String?>(
-                      value: u['id'] as String, child: Text(u['name']))),
+                    value: null,
+                    child: Text("Select University"),
+                  ),
+                  ...universities.map(
+                    (u) => DropdownMenuItem<String?>(
+                      value: u['id'] as String,
+                      child: Text(u['name']),
+                    ),
+                  ),
                 ],
                 onChanged: (val) async {
                   setState(() {
@@ -314,14 +329,19 @@ class _AdminDashboardState extends State<AdminDashboard>
               decoration: const InputDecoration(
                 labelText: "Semester",
                 border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: [
                 const DropdownMenuItem<String?>(
-                    value: null, child: Text("All Semesters")),
+                  value: null,
+                  child: Text("All Semesters"),
+                ),
                 ...semesters.map(
-                    (s) => DropdownMenuItem<String?>(value: s, child: Text(s)))
+                  (s) => DropdownMenuItem<String?>(value: s, child: Text(s)),
+                ),
               ],
               onChanged: (val) {
                 setState(() {
@@ -344,14 +364,22 @@ class _AdminDashboardState extends State<AdminDashboard>
               decoration: const InputDecoration(
                 labelText: "Department",
                 border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: [
                 const DropdownMenuItem<String?>(
-                    value: null, child: Text("All Departments")),
-                ...departments.map((d) => DropdownMenuItem<String?>(
-                    value: d['id'] as String, child: Text(d['name']))),
+                  value: null,
+                  child: Text("All Departments"),
+                ),
+                ...departments.map(
+                  (d) => DropdownMenuItem<String?>(
+                    value: d['id'] as String,
+                    child: Text(d['name']),
+                  ),
+                ),
               ],
               onChanged: isDepartmentAdmin
                   ? null
@@ -359,8 +387,9 @@ class _AdminDashboardState extends State<AdminDashboard>
                       setState(() {
                         selectedDept = val;
                         selectedDeptName = val != null
-                            ? departments
-                                .firstWhere((e) => e['id'] == val)['name']
+                            ? departments.firstWhere(
+                                (e) => e['id'] == val,
+                              )['name']
                             : null;
                         selectedSection = null;
                         selectedSectionName = null;
@@ -380,14 +409,22 @@ class _AdminDashboardState extends State<AdminDashboard>
               decoration: const InputDecoration(
                 labelText: "Section",
                 border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: [
                 const DropdownMenuItem<String?>(
-                    value: null, child: Text("All Sections")),
-                ...sections.map((s) => DropdownMenuItem<String?>(
-                    value: s['id'] as String, child: Text(s['name']))),
+                  value: null,
+                  child: Text("All Sections"),
+                ),
+                ...sections.map(
+                  (s) => DropdownMenuItem<String?>(
+                    value: s['id'] as String,
+                    child: Text(s['name']),
+                  ),
+                ),
               ],
               onChanged: (val) {
                 setState(() {
@@ -407,14 +444,20 @@ class _AdminDashboardState extends State<AdminDashboard>
               decoration: const InputDecoration(
                 labelText: "Shift",
                 border: OutlineInputBorder(),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: const [
                 DropdownMenuItem<String?>(
-                    value: 'morning', child: Text("Morning")),
+                  value: 'morning',
+                  child: Text("Morning"),
+                ),
                 DropdownMenuItem<String?>(
-                    value: 'evening', child: Text("Evening")),
+                  value: 'evening',
+                  child: Text("Evening"),
+                ),
               ],
               onChanged: (val) =>
                   setState(() => selectedShift = val ?? 'morning'),
@@ -432,12 +475,14 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget _buildGridTimetable() {
     if (selectedUni == null) {
       return const Center(
-          child: Text("Please select a University from the sidebar"));
+        child: Text("Please select a University from the sidebar"),
+      );
     }
 
     if (selectedDept == null) {
       return const Center(
-          child: Text("Please select a Department from the sidebar"));
+        child: Text("Please select a Department from the sidebar"),
+      );
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -481,11 +526,17 @@ class _AdminDashboardState extends State<AdminDashboard>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _buildLegendItem(
-              Colors.green.shade100, 'Empty Slot', Icons.add_circle),
+            Colors.green.shade100,
+            'Empty Slot',
+            Icons.add_circle,
+          ),
           _buildLegendItem(Colors.orange.shade100, 'Lab', Icons.science),
           if (conflictCount > 0)
-            _buildLegendItem(Colors.red.shade100, 'Conflict ($conflictCount)',
-                Icons.warning),
+            _buildLegendItem(
+              Colors.red.shade100,
+              'Conflict ($conflictCount)',
+              Icons.warning,
+            ),
         ],
       ),
     );
@@ -510,7 +561,9 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildTimetableGrid(
-      List<QueryDocumentSnapshot> docs, List<String> conflicts) {
+    List<QueryDocumentSnapshot> docs,
+    List<String> conflicts,
+  ) {
     final timeSlots = _getTimeSlots(selectedShift);
     const cellWidth = 180.0;
     const cellHeight = 100.0;
@@ -537,9 +590,21 @@ class _AdminDashboardState extends State<AdminDashboard>
       child: Stack(
         children: [
           _buildGridSkeleton(
-              timeSlots, cellWidth, cellHeight, headerHeight, timeColumnWidth),
-          ..._buildClassOverlaysGrouped(classesByCell, conflicts, timeSlots,
-              cellWidth, cellHeight, headerHeight, timeColumnWidth),
+            timeSlots,
+            cellWidth,
+            cellHeight,
+            headerHeight,
+            timeColumnWidth,
+          ),
+          ..._buildClassOverlaysGrouped(
+            classesByCell,
+            conflicts,
+            timeSlots,
+            cellWidth,
+            cellHeight,
+            headerHeight,
+            timeColumnWidth,
+          ),
         ],
       ),
     );
@@ -564,26 +629,35 @@ class _AdminDashboardState extends State<AdminDashboard>
                 border: Border.all(color: Colors.white, width: 1),
               ),
               child: const Center(
-                child: Text('Time',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Time',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-            ...days.map((day) => Container(
-                  width: cellWidth,
-                  height: headerHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.indigo,
-                    border: Border.all(color: Colors.white, width: 1),
+            ...days.map(
+              (day) => Container(
+                width: cellWidth,
+                height: headerHeight,
+                decoration: BoxDecoration(
+                  color: Colors.indigo,
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+                child: Center(
+                  child: Text(
+                    day,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
-                  child: Center(
-                    child: Text(day,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14)),
-                  ),
-                )),
+                ),
+              ),
+            ),
           ],
         ),
         ...timeSlots.map((slot) {
@@ -601,13 +675,19 @@ class _AdminDashboardState extends State<AdminDashboard>
                     '${_formatTime12(slot['start'] ?? '')}\n${_formatTime12(slot['end'] ?? '')}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.bold),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
               ...days.map((day) {
                 return _buildEmptyCell(
-                    day: day, slot: slot, width: cellWidth, height: cellHeight);
+                  day: day,
+                  slot: slot,
+                  width: cellWidth,
+                  height: cellHeight,
+                );
               }),
             ],
           );
@@ -637,8 +717,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
           child: Center(
             child: IconButton(
-              icon: Icon(Icons.add_circle,
-                  color: Colors.green.shade300, size: 32),
+              icon: Icon(
+                Icons.add_circle,
+                color: Colors.green.shade300,
+                size: 32,
+              ),
               onPressed: () => _showQuickAddDialog(day, slot['start']!),
             ),
           ),
@@ -704,7 +787,10 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildDraggableClass(
-      DocumentSnapshot doc, Map<String, dynamic> data, bool hasConflict) {
+    DocumentSnapshot doc,
+    Map<String, dynamic> data,
+    bool hasConflict,
+  ) {
     final dataWithId = Map<String, dynamic>.from(data);
     dataWithId['_docId'] = doc.id;
     final isLab = data['isLab'] ?? false;
@@ -743,22 +829,33 @@ class _AdminDashboardState extends State<AdminDashboard>
           width: 160,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-              color: bgColor, borderRadius: BorderRadius.circular(8)),
-          child: Text(data['subject'],
-              style: TextStyle(
-                  color: textColor, fontWeight: FontWeight.bold, fontSize: 14)),
+            color: bgColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            data['subject'],
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
         ),
       ),
       childWhenDragging: Opacity(
-          opacity: 0.3,
-          child:
-              _buildClassContent(dataWithId, bgColor, textColor, hasConflict)),
+        opacity: 0.3,
+        child: _buildClassContent(dataWithId, bgColor, textColor, hasConflict),
+      ),
       child: _buildClassContent(dataWithId, bgColor, textColor, hasConflict),
     );
   }
 
-  Widget _buildClassContent(Map<String, dynamic> data, Color bgColor,
-      Color textColor, bool hasConflict) {
+  Widget _buildClassContent(
+    Map<String, dynamic> data,
+    Color bgColor,
+    Color textColor,
+    bool hasConflict,
+  ) {
     final isLab = data['isLab'] ?? false;
     final sectionName = data['sectionId'] ?? '';
 
@@ -773,9 +870,10 @@ class _AdminDashboardState extends State<AdminDashboard>
           border: hasConflict ? Border.all(color: Colors.red, width: 2) : null,
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.15),
-                blurRadius: 4,
-                offset: const Offset(0, 2))
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
@@ -785,59 +883,77 @@ class _AdminDashboardState extends State<AdminDashboard>
             Row(
               children: [
                 Expanded(
-                  child: Text(data['subject'],
-                      style: TextStyle(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    data['subject'],
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (isLab)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(3)),
-                    child: const Text('LAB',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold)),
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: const Text(
+                      'LAB',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
               ],
             ),
             if (selectedSection == null && sectionName.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text('Sec: $sectionName',
-                  style: TextStyle(
-                      color: textColor.withOpacity(0.9),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                'Sec: $sectionName',
+                style: TextStyle(
+                  color: textColor.withOpacity(0.9),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
             const SizedBox(height: 2),
-            Text('${data['start']} - ${data['end']}',
-                style:
-                    TextStyle(color: textColor.withOpacity(0.85), fontSize: 8)),
-            Text('📍 ${data['location']}',
-                style:
-                    TextStyle(color: textColor.withOpacity(0.8), fontSize: 8),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            Text('👤 ${data['teacher']}',
-                style:
-                    TextStyle(color: textColor.withOpacity(0.8), fontSize: 8),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            Text(
+              '${data['start']} - ${data['end']}',
+              style: TextStyle(color: textColor.withOpacity(0.85), fontSize: 8),
+            ),
+            Text(
+              '📍 ${data['location']}',
+              style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 8),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              '👤 ${data['teacher']}',
+              style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 8),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             if (hasConflict)
               const Padding(
                 padding: EdgeInsets.only(top: 2),
-                child: Text('⚠️ CONFLICT',
-                    style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 7,
-                        fontWeight: FontWeight.bold)),
+                child: Text(
+                  '⚠️ CONFLICT',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontSize: 7,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
           ],
         ),
@@ -883,7 +999,10 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Future<void> _handleDrop(
-      Map<String, dynamic> classData, String newDay, String newStart) async {
+    Map<String, dynamic> classData,
+    String newDay,
+    String newStart,
+  ) async {
     final docId = classData['docId'] as String;
     final oldDay = classData['day'] as String;
     final oldStart = classData['start'] as String;
@@ -904,9 +1023,12 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
 
     if (conflict != null) {
-      Get.snackbar("Cannot Move", conflict,
-          backgroundColor: Colors.red.shade100,
-          duration: const Duration(seconds: 4));
+      Get.snackbar(
+        "Cannot Move",
+        conflict,
+        backgroundColor: Colors.red.shade100,
+        duration: const Duration(seconds: 4),
+      );
       return;
     }
 
@@ -915,14 +1037,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         .doc(selectedUni!)
         .collection('timetables')
         .doc(docId)
-        .update({
-      'day': newDay,
-      'start': newStart,
-      'end': endTime,
-    });
+        .update({'day': newDay, 'start': newStart, 'end': endTime});
 
-    Get.snackbar("Moved", "Class moved successfully",
-        backgroundColor: Colors.green.shade100);
+    Get.snackbar(
+      "Moved",
+      "Class moved successfully",
+      backgroundColor: Colors.green.shade100,
+    );
   }
 
   void _showQuickAddDialog(String day, String startTime) {
@@ -946,28 +1067,40 @@ class _AdminDashboardState extends State<AdminDashboard>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("$day - $startTime to $endTime",
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  "$day - $startTime to $endTime",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 10),
                 SwitchListTile(
-                    title: const Text("Lab Session?"),
-                    value: isLab,
-                    onChanged: (val) => setState(() => isLab = val)),
+                  title: const Text("Lab Session?"),
+                  value: isLab,
+                  onChanged: (val) => setState(() => isLab = val),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: subjectCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Subject", border: OutlineInputBorder())),
+                  controller: subjectCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Subject",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: roomCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Room", border: OutlineInputBorder())),
+                  controller: roomCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Room",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: teacherCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Teacher", border: OutlineInputBorder())),
+                  controller: teacherCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Teacher",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               ],
             ),
           );
@@ -988,8 +1121,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           );
 
           if (conflict != null) {
-            Get.snackbar("Conflict!", conflict,
-                backgroundColor: Colors.red.shade100);
+            Get.snackbar(
+              "Conflict!",
+              conflict,
+              backgroundColor: Colors.red.shade100,
+            );
             return;
           }
 
@@ -999,6 +1135,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               'departmentId': selectedDept,
               'sectionId': selectedSection,
               'shift': selectedShift,
+              'semester': selectedSemester,
               'day': day,
               'start': startTime,
               'end': endTime,
@@ -1007,20 +1144,25 @@ class _AdminDashboardState extends State<AdminDashboard>
               'teacher': teacherCtrl.text.trim(),
               'isLab': isLab,
               'colorValue': Colors
-                  .primaries[
-                      (subjectCtrl.text.length) % Colors.primaries.length]
+                  .primaries[(subjectCtrl.text.length) %
+                      Colors.primaries.length]
                   .value,
               'createdAt': FieldValue.serverTimestamp(),
             },
           );
 
           Get.back();
-          Get.snackbar("Added", "Class added successfully",
-              backgroundColor: Colors.green.shade100);
+          Get.snackbar(
+            "Added",
+            "Class added successfully",
+            backgroundColor: Colors.green.shade100,
+          );
         },
       ),
-      cancel:
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+      cancel: TextButton(
+        onPressed: () => Get.back(),
+        child: const Text("Cancel"),
+      ),
     );
   }
 
@@ -1035,15 +1177,16 @@ class _AdminDashboardState extends State<AdminDashboard>
           children: [
             _buildDetailRow('Day', data['day'] ?? ''),
             _buildDetailRow(
-                'Time', '${data['start'] ?? ''} - ${data['end'] ?? ''}'),
+              'Time',
+              '${data['start'] ?? ''} - ${data['end'] ?? ''}',
+            ),
             _buildDetailRow('Room', data['location'] ?? ''),
             _buildDetailRow('Teacher', data['teacher'] ?? ''),
             _buildDetailRow('Section', data['sectionId'] ?? 'N/A'),
             _buildDetailRow(
-                'Type',
-                (data['isLab'] ?? false)
-                    ? 'Lab (180 min)'
-                    : 'Lecture (80 min)'),
+              'Type',
+              (data['isLab'] ?? false) ? 'Lab (180 min)' : 'Lecture (80 min)',
+            ),
             _buildDetailRow('Shift', data['shift'] ?? 'N/A'),
           ],
         ),
@@ -1063,13 +1206,18 @@ class _AdminDashboardState extends State<AdminDashboard>
                     if (docId == null || selectedUni == null) {
                       Get.back();
                       Get.snackbar(
-                          'Error', 'Unable to delete: missing identifiers');
+                        'Error',
+                        'Unable to delete: missing identifiers',
+                      );
                       return;
                     }
                     await _service.deleteClass(selectedUni!, docId.toString());
                     Get.back();
-                    Get.snackbar('Deleted', 'Class removed',
-                        backgroundColor: Colors.green.shade100);
+                    Get.snackbar(
+                      'Deleted',
+                      'Class removed',
+                      backgroundColor: Colors.green.shade100,
+                    );
                   },
                 );
               },
@@ -1093,9 +1241,12 @@ class _AdminDashboardState extends State<AdminDashboard>
       child: Row(
         children: [
           SizedBox(
-              width: 80,
-              child: Text('$label:',
-                  style: const TextStyle(fontWeight: FontWeight.bold))),
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
           Expanded(child: Text(value)),
         ],
       ),
@@ -1127,7 +1278,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                 SwitchListTile(
                   title: const Text("Is this a Lab?"),
                   subtitle: Text(
-                      isLab ? "Duration: 180 minutes" : "Duration: 80 minutes"),
+                    isLab ? "Duration: 180 minutes" : "Duration: 80 minutes",
+                  ),
                   value: isLab,
                   onChanged: (val) => setState(() => isLab = val),
                 ),
@@ -1139,37 +1291,53 @@ class _AdminDashboardState extends State<AdminDashboard>
                       .toList(),
                   onChanged: (v) => setState(() => day = v!),
                   decoration: const InputDecoration(
-                      labelText: "Day", border: OutlineInputBorder()),
+                    labelText: "Day",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: startTime,
                   items: availableSlots
-                      .map((slot) => DropdownMenuItem(
+                      .map(
+                        (slot) => DropdownMenuItem(
                           value: slot,
                           child: Text(
-                              '$slot - ${_calculateEndTime(slot, isLab)}')))
+                            '$slot - ${_calculateEndTime(slot, isLab)}',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => startTime = v!),
                   decoration: const InputDecoration(
-                      labelText: "Time Slot", border: OutlineInputBorder()),
+                    labelText: "Time Slot",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: subjectCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Subject", border: OutlineInputBorder())),
+                  controller: subjectCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Subject",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: roomCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Room No", border: OutlineInputBorder())),
+                  controller: roomCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Room No",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: teacherCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Teacher Name",
-                        border: OutlineInputBorder())),
+                  controller: teacherCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Teacher Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               ],
             ),
           );
@@ -1191,9 +1359,12 @@ class _AdminDashboardState extends State<AdminDashboard>
           );
 
           if (conflict != null) {
-            Get.snackbar("Conflict Detected!", conflict,
-                backgroundColor: Colors.red.shade100,
-                duration: const Duration(seconds: 5));
+            Get.snackbar(
+              "Conflict Detected!",
+              conflict,
+              backgroundColor: Colors.red.shade100,
+              duration: const Duration(seconds: 5),
+            );
             return;
           }
 
@@ -1203,22 +1374,27 @@ class _AdminDashboardState extends State<AdminDashboard>
               .collection('timetables')
               .doc(data['docId'])
               .update({
-            'day': day,
-            'start': startTime,
-            'end': endTime,
-            'subject': subjectCtrl.text.trim(),
-            'location': roomCtrl.text.trim(),
-            'teacher': teacherCtrl.text.trim(),
-            'isLab': isLab,
-          });
+                'day': day,
+                'start': startTime,
+                'end': endTime,
+                'subject': subjectCtrl.text.trim(),
+                'location': roomCtrl.text.trim(),
+                'teacher': teacherCtrl.text.trim(),
+                'isLab': isLab,
+              });
 
           Get.back();
-          Get.snackbar("Success", "Class updated successfully",
-              backgroundColor: Colors.green.shade100);
+          Get.snackbar(
+            "Success",
+            "Class updated successfully",
+            backgroundColor: Colors.green.shade100,
+          );
         },
       ),
-      cancel:
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+      cancel: TextButton(
+        onPressed: () => Get.back(),
+        child: const Text("Cancel"),
+      ),
     );
   }
 
@@ -1226,8 +1402,10 @@ class _AdminDashboardState extends State<AdminDashboard>
     if (selectedUni == null ||
         selectedDept == null ||
         selectedSection == null) {
-      Get.snackbar('Missing Info',
-          'Please select University, Department and Section from the sidebar.');
+      Get.snackbar(
+        'Missing Info',
+        'Please select University, Department and Section from the sidebar.',
+      );
       return;
     }
 
@@ -1253,8 +1431,9 @@ class _AdminDashboardState extends State<AdminDashboard>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                    "$selectedDeptName - $selectedSectionName ($selectedShift)",
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  "$selectedDeptName - $selectedSectionName ($selectedShift)",
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
                 const SizedBox(height: 10),
                 SwitchListTile(
                   title: const Text("Is this a Lab?"),
@@ -1269,36 +1448,53 @@ class _AdminDashboardState extends State<AdminDashboard>
                       .toList(),
                   onChanged: (v) => setState(() => day = v!),
                   decoration: const InputDecoration(
-                      labelText: "Day", border: OutlineInputBorder()),
+                    labelText: "Day",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: startTime,
                   items: availableSlots
-                      .map((slot) => DropdownMenuItem(
+                      .map(
+                        (slot) => DropdownMenuItem(
                           value: slot,
                           child: Text(
-                              '$slot - ${_calculateEndTime(slot, isLab)}')))
+                            '$slot - ${_calculateEndTime(slot, isLab)}',
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) => setState(() => startTime = v!),
                   decoration: const InputDecoration(
-                      labelText: "Time", border: OutlineInputBorder()),
+                    labelText: "Time",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: subjectCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Subject", border: OutlineInputBorder())),
+                  controller: subjectCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Subject",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: roomCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Room", border: OutlineInputBorder())),
+                  controller: roomCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Room",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 TextField(
-                    controller: teacherCtrl,
-                    decoration: const InputDecoration(
-                        labelText: "Teacher", border: OutlineInputBorder())),
+                  controller: teacherCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Teacher",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
               ],
             ),
           );
@@ -1319,8 +1515,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           );
 
           if (conflict != null) {
-            Get.snackbar("Conflict!", conflict,
-                backgroundColor: Colors.red.shade100);
+            Get.snackbar(
+              "Conflict!",
+              conflict,
+              backgroundColor: Colors.red.shade100,
+            );
             return;
           }
 
@@ -1330,6 +1529,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               'departmentId': selectedDept,
               'sectionId': selectedSection,
               'shift': selectedShift,
+              'semester': selectedSemester,
               'day': day,
               'start': startTime,
               'end': endTime,
@@ -1338,20 +1538,25 @@ class _AdminDashboardState extends State<AdminDashboard>
               'teacher': teacherCtrl.text.trim(),
               'isLab': isLab,
               'colorValue': Colors
-                  .primaries[
-                      (subjectCtrl.text.length) % Colors.primaries.length]
+                  .primaries[(subjectCtrl.text.length) %
+                      Colors.primaries.length]
                   .value,
               'createdAt': FieldValue.serverTimestamp(),
             },
           );
 
           Get.back();
-          Get.snackbar("Success", "Class added",
-              backgroundColor: Colors.green.shade100);
+          Get.snackbar(
+            "Success",
+            "Class added",
+            backgroundColor: Colors.green.shade100,
+          );
         },
       ),
-      cancel:
-          TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+      cancel: TextButton(
+        onPressed: () => Get.back(),
+        child: const Text("Cancel"),
+      ),
     );
   }
 
@@ -1363,9 +1568,10 @@ class _AdminDashboardState extends State<AdminDashboard>
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text("Manage Users - ${_getContextTitle()}",
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: Text(
+            "Manage Users - ${_getContextTitle()}",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
@@ -1426,7 +1632,8 @@ class _AdminDashboardState extends State<AdminDashboard>
 
               if (filteredUsers.isEmpty) {
                 return const Center(
-                    child: Text('No users found in this context'));
+                  child: Text('No users found in this context'),
+                );
               }
 
               return ListView.builder(
@@ -1498,17 +1705,20 @@ class _AdminDashboardState extends State<AdminDashboard>
               DropdownButton<String>(
                 value: newRole,
                 isExpanded: true,
-                items: (isSuperAdmin
-                        ? ['student', 'admin', 'super_admin']
-                        : ['student', 'admin'])
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
+                items:
+                    (isSuperAdmin
+                            ? ['student', 'admin', 'super_admin']
+                            : ['student', 'admin'])
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
                 onChanged: (v) => setState(() => newRole = v!),
               ),
               if (newRole == 'admin') ...[
                 const SizedBox(height: 16),
-                const Text('Admin Scope:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Admin Scope:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 8),
                 Text('University: ${selectedUniName ?? "None"}'),
                 Text('Department: ${selectedDeptName ?? "University-wide"}'),
@@ -1529,12 +1739,18 @@ class _AdminDashboardState extends State<AdminDashboard>
 
           await _service.updateUserRole(uid, newRole, scope);
           Get.back();
-          Get.snackbar('Success', 'Role updated',
-              backgroundColor: Colors.green.shade100);
+          Get.snackbar(
+            'Success',
+            'Role updated',
+            backgroundColor: Colors.green.shade100,
+          );
         } catch (e) {
           Get.back();
-          Get.snackbar('Error', e.toString(),
-              backgroundColor: Colors.red.shade100);
+          Get.snackbar(
+            'Error',
+            e.toString(),
+            backgroundColor: Colors.red.shade100,
+          );
         }
       },
     );
@@ -1554,8 +1770,10 @@ class _AdminDashboardState extends State<AdminDashboard>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Setup Wizard',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text(
+              'Setup Wizard',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
             ListTile(
               leading: const Icon(Icons.school, color: Colors.purple),
@@ -1570,8 +1788,9 @@ class _AdminDashboardState extends State<AdminDashboard>
               ListTile(
                 leading: const Icon(Icons.business, color: Colors.indigo),
                 title: const Text('Add Department'),
-                subtitle:
-                    Text('To ${selectedUniName ?? "selected university"}'),
+                subtitle: Text(
+                  'To ${selectedUniName ?? "selected university"}',
+                ),
                 onTap: () {
                   Get.back();
                   _startDepartmentWizard();
@@ -1581,8 +1800,9 @@ class _AdminDashboardState extends State<AdminDashboard>
               ListTile(
                 leading: const Icon(Icons.group, color: Colors.teal),
                 title: const Text('Add Section'),
-                subtitle:
-                    Text('To ${selectedDeptName ?? "selected department"}'),
+                subtitle: Text(
+                  'To ${selectedDeptName ?? "selected department"}',
+                ),
                 onTap: () {
                   Get.back();
                   _startSectionWizard();
@@ -1609,8 +1829,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         actions: [
           TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancel')),
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               if (ctrl.text.trim().isEmpty) {
@@ -1669,8 +1890,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         actions: [
           TextButton(
-              onPressed: () => Get.back(result: false),
-              child: const Text('Cancel')),
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               if (ctrl.text.trim().isEmpty) {
@@ -1736,11 +1958,17 @@ class _AdminDashboardState extends State<AdminDashboard>
                 return;
               }
               await _service.addSection(
-                  selectedUni!, selectedDept!, ctrl.text.trim());
+                selectedUni!,
+                selectedDept!,
+                ctrl.text.trim(),
+              );
               await _fetchSections(selectedUni!, selectedDept!);
               Get.back();
-              Get.snackbar('Success', 'Section added',
-                  backgroundColor: Colors.green.shade100);
+              Get.snackbar(
+                'Success',
+                'Section added',
+                backgroundColor: Colors.green.shade100,
+              );
             },
             child: const Text('Add'),
           ),
@@ -1760,25 +1988,37 @@ class _AdminDashboardState extends State<AdminDashboard>
     }
 
     String? toDelete;
-    Get.dialog(AlertDialog(
-      title: const Text('Delete University'),
-      content: StatefulBuilder(builder: (c, setState) {
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-              value: toDelete,
-              items: universities
-                  .map((u) => DropdownMenuItem(
-                      value: u['id'] as String, child: Text(u['name'])))
-                  .toList(),
-              onChanged: (v) => setState(() => toDelete = v)),
-          const SizedBox(height: 12),
-          const Text(
-              'Warning: This will delete the entire university and all related data.'),
-        ]);
-      }),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete University'),
+        content: StatefulBuilder(
+          builder: (c, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: toDelete,
+                  items: universities
+                      .map(
+                        (u) => DropdownMenuItem(
+                          value: u['id'] as String,
+                          child: Text(u['name']),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => toDelete = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Warning: This will delete the entire university and all related data.',
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               if (toDelete == null) return;
@@ -1791,16 +2031,24 @@ class _AdminDashboardState extends State<AdminDashboard>
                 }
                 setState(() {});
                 Get.back();
-                Get.snackbar('Deleted', 'University removed',
-                    backgroundColor: Colors.green.shade100);
+                Get.snackbar(
+                  'Deleted',
+                  'University removed',
+                  backgroundColor: Colors.green.shade100,
+                );
               } catch (e) {
-                Get.snackbar('Error', e.toString(),
-                    backgroundColor: Colors.red.shade100);
+                Get.snackbar(
+                  'Error',
+                  e.toString(),
+                  backgroundColor: Colors.red.shade100,
+                );
               }
             },
-            child: const Text('Delete'))
-      ],
-    ));
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteDepartmentDialog() {
@@ -1811,25 +2059,37 @@ class _AdminDashboardState extends State<AdminDashboard>
     }
 
     String? toDelete;
-    Get.dialog(AlertDialog(
-      title: const Text('Delete Department'),
-      content: StatefulBuilder(builder: (c, setState) {
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-              value: toDelete,
-              items: departments
-                  .map((d) => DropdownMenuItem(
-                      value: d['id'] as String, child: Text(d['name'])))
-                  .toList(),
-              onChanged: (v) => setState(() => toDelete = v)),
-          const SizedBox(height: 12),
-          const Text(
-              'Warning: This will delete the department and related timetables.'),
-        ]);
-      }),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Department'),
+        content: StatefulBuilder(
+          builder: (c, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: toDelete,
+                  items: departments
+                      .map(
+                        (d) => DropdownMenuItem(
+                          value: d['id'] as String,
+                          child: Text(d['name']),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => toDelete = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Warning: This will delete the department and related timetables.',
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
               if (toDelete == null) return;
@@ -1842,16 +2102,24 @@ class _AdminDashboardState extends State<AdminDashboard>
                 }
                 setState(() {});
                 Get.back();
-                Get.snackbar('Deleted', 'Department removed',
-                    backgroundColor: Colors.green.shade100);
+                Get.snackbar(
+                  'Deleted',
+                  'Department removed',
+                  backgroundColor: Colors.green.shade100,
+                );
               } catch (e) {
-                Get.snackbar('Error', e.toString(),
-                    backgroundColor: Colors.red.shade100);
+                Get.snackbar(
+                  'Error',
+                  e.toString(),
+                  backgroundColor: Colors.red.shade100,
+                );
               }
             },
-            child: const Text('Delete'))
-      ],
-    ));
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteSectionDialog() {
@@ -1862,31 +2130,46 @@ class _AdminDashboardState extends State<AdminDashboard>
     }
 
     String? toDelete;
-    Get.dialog(AlertDialog(
-      title: const Text('Delete Section'),
-      content: StatefulBuilder(builder: (c, setState) {
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-              value: toDelete,
-              items: sections
-                  .map((s) => DropdownMenuItem(
-                      value: s['id'] as String, child: Text(s['name'])))
-                  .toList(),
-              onChanged: (v) => setState(() => toDelete = v)),
-          const SizedBox(height: 12),
-          const Text(
-              'Warning: This will delete the section and related timetables.'),
-        ]);
-      }),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Section'),
+        content: StatefulBuilder(
+          builder: (c, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: toDelete,
+                  items: sections
+                      .map(
+                        (s) => DropdownMenuItem(
+                          value: s['id'] as String,
+                          child: Text(s['name']),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => toDelete = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Warning: This will delete the section and related timetables.',
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: () async {
               if (toDelete == null) return;
               try {
                 await _service.deleteSection(
-                    selectedUni!, selectedDept!, toDelete!);
+                  selectedUni!,
+                  selectedDept!,
+                  toDelete!,
+                );
                 await _fetchSections(selectedUni!, selectedDept!);
                 if (selectedSection == toDelete) {
                   selectedSection = null;
@@ -1894,40 +2177,56 @@ class _AdminDashboardState extends State<AdminDashboard>
                 }
                 setState(() {});
                 Get.back();
-                Get.snackbar('Deleted', 'Section removed',
-                    backgroundColor: Colors.green.shade100);
+                Get.snackbar(
+                  'Deleted',
+                  'Section removed',
+                  backgroundColor: Colors.green.shade100,
+                );
               } catch (e) {
-                Get.snackbar('Error', e.toString(),
-                    backgroundColor: Colors.red.shade100);
+                Get.snackbar(
+                  'Error',
+                  e.toString(),
+                  backgroundColor: Colors.red.shade100,
+                );
               }
             },
-            child: const Text('Delete'))
-      ],
-    ));
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteSemesterDialog() {
     if (!isSuperAdmin || selectedUni == null) return;
     String? sem;
-    Get.dialog(AlertDialog(
-      title: const Text('Delete Semester'),
-      content: StatefulBuilder(builder: (c, setState) {
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-              value: sem,
-              hint: const Text('Select semester'),
-              items: semesters
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (v) => setState(() => sem = v)),
-          const SizedBox(height: 12),
-          const Text(
-              'Warning: This will delete all classes for the selected semester.'),
-        ]);
-      }),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Semester'),
+        content: StatefulBuilder(
+          builder: (c, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: sem,
+                  hint: const Text('Select semester'),
+                  items: semesters
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setState(() => sem = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Warning: This will delete all classes for the selected semester.',
+                ),
+              ],
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.brown),
             onPressed: () async {
               if (sem == null) return;
@@ -1935,59 +2234,84 @@ class _AdminDashboardState extends State<AdminDashboard>
                 await _service.deleteSemester(selectedUni!, sem!);
                 setState(() {});
                 Get.back();
-                Get.snackbar('Deleted', 'Semester classes removed',
-                    backgroundColor: Colors.green.shade100);
+                Get.snackbar(
+                  'Deleted',
+                  'Semester classes removed',
+                  backgroundColor: Colors.green.shade100,
+                );
               } catch (e) {
-                Get.snackbar('Error', e.toString(),
-                    backgroundColor: Colors.red.shade100);
+                Get.snackbar(
+                  'Error',
+                  e.toString(),
+                  backgroundColor: Colors.red.shade100,
+                );
               }
             },
-            child: const Text('Delete'))
-      ],
-    ));
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeleteShiftDialog() {
     if (!isSuperAdmin || selectedUni == null) return;
     String? sft = selectedShift;
-    Get.dialog(AlertDialog(
-      title: const Text('Delete Shift'),
-      content: StatefulBuilder(builder: (c, setState) {
-        return Column(mainAxisSize: MainAxisSize.min, children: [
-          DropdownButtonFormField<String>(
-              value: sft,
-              hint: const Text('Select shift'),
-              items: const [
-                DropdownMenuItem(value: 'morning', child: Text('Morning')),
-                DropdownMenuItem(value: 'evening', child: Text('Evening')),
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Shift'),
+        content: StatefulBuilder(
+          builder: (c, setState) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: sft,
+                  hint: const Text('Select shift'),
+                  items: const [
+                    DropdownMenuItem(value: 'morning', child: Text('Morning')),
+                    DropdownMenuItem(value: 'evening', child: Text('Evening')),
+                  ],
+                  onChanged: (v) => setState(() => sft = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Warning: This will delete all classes for the selected shift.',
+                ),
               ],
-              onChanged: (v) => setState(() => sft = v)),
-          const SizedBox(height: 12),
-          const Text(
-              'Warning: This will delete all classes for the selected shift.'),
-        ]);
-      }),
-      actions: [
-        TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
-        ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: Colors.purpleAccent),
+            );
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purpleAccent,
+            ),
             onPressed: () async {
               if (sft == null) return;
               try {
                 await _service.deleteShift(selectedUni!, sft!);
                 setState(() {});
                 Get.back();
-                Get.snackbar('Deleted', 'Shift classes removed',
-                    backgroundColor: Colors.green.shade100);
+                Get.snackbar(
+                  'Deleted',
+                  'Shift classes removed',
+                  backgroundColor: Colors.green.shade100,
+                );
               } catch (e) {
-                Get.snackbar('Error', e.toString(),
-                    backgroundColor: Colors.red.shade100);
+                Get.snackbar(
+                  'Error',
+                  e.toString(),
+                  backgroundColor: Colors.red.shade100,
+                );
               }
             },
-            child: const Text('Delete'))
-      ],
-    ));
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ==========================================

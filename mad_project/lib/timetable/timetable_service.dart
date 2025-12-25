@@ -145,16 +145,16 @@ class TimetableService {
         .doc(uniId)
         .collection('timetables')
         .doc(docId)
-        .update({
-      'start': newStart,
-      'end': newEnd,
-    });
+        .update({'start': newStart, 'end': newEnd});
 
     return null; // Success
   }
 
   Future<void> updateUserRole(
-      String uid, String role, Map<String, dynamic>? scope) async {
+    String uid,
+    String role,
+    Map<String, dynamic>? scope,
+  ) async {
     // Use callable Cloud Function to perform privileged role updates and set claims.
     try {
       final functions = FirebaseFunctions.instance;
@@ -212,8 +212,10 @@ class TimetableService {
     String? shift,
     String? semester,
   }) {
-    Query query =
-        _db.collection('universities').doc(uniId).collection('timetables');
+    Query query = _db
+        .collection('universities')
+        .doc(uniId)
+        .collection('timetables');
 
     if (deptId != null && deptId.isNotEmpty) {
       query = query.where('departmentId', isEqualTo: deptId);
@@ -313,24 +315,21 @@ class TimetableService {
         .collection('universities')
         .doc(uniId)
         .collection('departments')
-        .add({
-      'name': name,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+        .add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
     return docRef.id;
   }
 
   Future<void> updateDepartment(
-      String uniId, String deptId, String name) async {
+    String uniId,
+    String deptId,
+    String name,
+  ) async {
     await _db
         .collection('universities')
         .doc(uniId)
         .collection('departments')
         .doc(deptId)
-        .update({
-      'name': name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+        .update({'name': name, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> deleteDepartment(String uniId, String deptId) async {
@@ -388,15 +387,16 @@ class TimetableService {
         .collection('departments')
         .doc(deptId)
         .collection('sections')
-        .add({
-      'name': name,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+        .add({'name': name, 'createdAt': FieldValue.serverTimestamp()});
     return docRef.id;
   }
 
   Future<void> updateSection(
-      String uniId, String deptId, String sectionId, String name) async {
+    String uniId,
+    String deptId,
+    String sectionId,
+    String name,
+  ) async {
     await _db
         .collection('universities')
         .doc(uniId)
@@ -404,14 +404,14 @@ class TimetableService {
         .doc(deptId)
         .collection('sections')
         .doc(sectionId)
-        .update({
-      'name': name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+        .update({'name': name, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
   Future<void> deleteSection(
-      String uniId, String deptId, String sectionId) async {
+    String uniId,
+    String deptId,
+    String sectionId,
+  ) async {
     // Delete all timetables for this section
     final timetableSnap = await _db
         .collection('universities')
@@ -465,7 +465,9 @@ class TimetableService {
   }
 
   Future<List<Map<String, dynamic>>> getSections(
-      String uniId, String deptId) async {
+    String uniId,
+    String deptId,
+  ) async {
     final snap = await _db
         .collection('universities')
         .doc(uniId)
@@ -547,8 +549,10 @@ class TimetableService {
     int totalTeachers = 0;
 
     // Count classes
-    Query classQuery =
-        _db.collection('universities').doc(uniId).collection('timetables');
+    Query classQuery = _db
+        .collection('universities')
+        .doc(uniId)
+        .collection('timetables');
 
     if (deptId != null && deptId.isNotEmpty) {
       classQuery = classQuery.where('departmentId', isEqualTo: deptId);
