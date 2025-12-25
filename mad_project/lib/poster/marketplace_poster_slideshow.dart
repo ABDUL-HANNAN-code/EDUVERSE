@@ -107,7 +107,7 @@ class _MarketplacePosterSlideshowState
     if (posters.length <= 1) return;
 
     debugPrint('Starting Autoplay');
-    _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) {
         timer.cancel();
         return;

@@ -486,45 +486,13 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
           return _buildDefaultBanner();
         final banners = snapshot.data!.docs;
         return SizedBox(
-          height: 200,
-          child: PageView.builder(
-            controller: _bannerController,
-            itemCount: banners.length,
-            onPageChanged: (i) => _currentBanner = i,
-            itemBuilder: (context, index) {
-              final banner = banners[index];
-              final data = banner.data() as Map<String, dynamic>;
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      MarketplaceImageDisplay(
-                          imageData: data['imageData'] ?? '',
-                          height: 200,
-                          fit: BoxFit.cover),
-                      if (userRole == 'admin' || userRole == 'super_admin')
-                        Positioned(
-                          top: 12,
-                          right: 12,
-                          child: Container(
-                            decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(12)),
-                            child: IconButton(
-                              icon:
-                                  const Icon(Icons.delete, color: Colors.white),
-                              onPressed: () => _confirmDeleteBanner(banner.id),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
+          height: 220,
+          child: BannerCarousel(
+            banners: banners,
+            isAdmin: (userRole == 'admin' || userRole == 'super_admin'),
+            onDelete: (index) async {
+              final id = banners[index].id;
+              _confirmDeleteBanner(id);
             },
           ),
         );
@@ -802,6 +770,249 @@ class MarketplaceImageDisplay extends StatelessWidget {
   }
 }
 
+// Carousel that accepts a list of image strings (URLs or base64) and
+// shows an autoplaying PageView with dot indicators. Falls back to a
+// single image when the list has one element.
+class MarketplaceImageCarousel extends StatefulWidget {
+  final List<String> images;
+  final double? height;
+  final double? width;
+  final BoxFit fit;
+
+  const MarketplaceImageCarousel({
+    super.key,
+    required this.images,
+    this.height,
+    this.width,
+    this.fit = BoxFit.cover,
+  });
+
+  @override
+  State<MarketplaceImageCarousel> createState() => _MarketplaceImageCarouselState();
+}
+
+// BannerCarousel: shows a list of banner documents (QueryDocumentSnapshot list)
+// with autoplay, dots, and optional admin delete overlay for the current slide.
+class BannerCarousel extends StatefulWidget {
+  final List<QueryDocumentSnapshot> banners;
+  final bool isAdmin;
+  final Future<void> Function(int index)? onDelete;
+  const BannerCarousel({super.key, required this.banners, this.isAdmin = false, this.onDelete});
+
+  @override
+  State<BannerCarousel> createState() => _BannerCarouselState();
+}
+
+class _BannerCarouselState extends State<BannerCarousel> {
+  late final PageController _controller;
+  int _current = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(viewportFraction: 0.96);
+    if (widget.banners.length > 1) _startAutoplay();
+  }
+
+  void _startAutoplay() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (!mounted) return;
+      final next = (_current + 1) % widget.banners.length;
+      if (_controller.hasClients) {
+        _controller.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final banners = widget.banners;
+    if (banners.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 200,
+          child: GestureDetector(
+            onPanDown: (_) => _timer?.cancel(),
+            onPanCancel: () { if (widget.banners.length>1) _startAutoplay(); },
+            onPanEnd: (_) { if (widget.banners.length>1) _startAutoplay(); },
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: banners.length,
+              onPageChanged: (i) => setState(() => _current = i),
+              itemBuilder: (context, index) {
+                final banner = banners[index];
+                final data = banner.data() as Map<String, dynamic>;
+                final image = data['imageData'] ?? '';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if ((data['images'] is List) || (data['imageUrls'] is List))
+                          MarketplaceImageCarousel(
+                            images: (data['images'] is List)
+                                ? List<String>.from((data['images'] as List).map((e) => e?.toString() ?? ''))
+                                : List<String>.from((data['imageUrls'] as List).map((e) => e?.toString() ?? '')),
+                            height: 200,
+                            fit: BoxFit.cover,
+                          )
+                        else if (image.toString().startsWith('http'))
+                          CachedNetworkImage(imageUrl: image.toString(), fit: BoxFit.cover)
+                        else if ((image ?? '').toString().isNotEmpty)
+                          Image.memory(base64Decode(image.toString()), fit: BoxFit.cover)
+                        else
+                          Container(color: Colors.grey[200]),
+
+                        if (widget.isAdmin)
+                          Positioned(
+                            top: 12,
+                            right: 12,
+                            child: Container(
+                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+                              child: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.white),
+                                onPressed: () async {
+                                  if (widget.onDelete != null) await widget.onDelete!(_current);
+                                },
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        if (banners.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(banners.length, (i) {
+                final active = i == _current;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: active ? 20 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(active ? 0.85 : 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                );
+              }),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _MarketplaceImageCarouselState extends State<MarketplaceImageCarousel> {
+  late final PageController _controller;
+  int _current = 0;
+  Timer? _autoplayTimer;
+  bool _isPaused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+    if (widget.images.length > 1) _startAutoplay();
+  }
+
+  void _startAutoplay() {
+    _autoplayTimer?.cancel();
+    _autoplayTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+      if (_isPaused) return;
+      final next = (_current + 1) % widget.images.length;
+      if (mounted) _controller.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoplayTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Widget _buildImage(String image) {
+    if (image.isEmpty) return Container(color: Colors.grey[200], height: widget.height, width: widget.width);
+    if (image.startsWith('http')) {
+      return CachedNetworkImage(imageUrl: image, height: widget.height, width: widget.width, fit: widget.fit, placeholder: (c,s)=>Container(color: Colors.grey[200], height: widget.height, width: widget.width), errorWidget: (c,s,e)=>Container(color: Colors.grey[200], height: widget.height, width: widget.width));
+    }
+    try {
+      final bytes = base64Decode(image);
+      return Image.memory(bytes, height: widget.height, width: widget.width, fit: widget.fit);
+    } catch (_) {
+      return Container(color: Colors.grey[200], height: widget.height, width: widget.width);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = widget.images.isEmpty ? [''] : widget.images;
+    if (images.length == 1) return _buildImage(images.first);
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPaused = true),
+      onTapUp: (_) => setState(() => _isPaused = false),
+      onTapCancel: () => setState(() => _isPaused = false),
+      child: SizedBox(
+        height: widget.height,
+        width: widget.width,
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: images.length,
+              onPageChanged: (i) => setState(() => _current = i),
+              itemBuilder: (context, index) => _buildImage(images[index]),
+            ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(images.length, (i) {
+                  final active = i == _current;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: active ? 20 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(active ? 0.85 : 0.25),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ==========================================
 // SEARCH BAR DELEGATE
 // ==========================================
@@ -944,15 +1155,17 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                   children: [
                     Hero(
                       tag: 'item_${widget.itemId}',
-                      child: ClipRRect(
+                        child: ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(16),
                           topRight: Radius.circular(16),
                         ),
-                        child: MarketplaceImageDisplay(
-                          imageData: widget.data['imageUrl'] ??
-                              widget.data['imageData'] ??
-                              '',
+                        child: MarketplaceImageCarousel(
+                          images: (widget.data['images'] is List)
+                              ? List<String>.from((widget.data['images'] as List).map((e) => e?.toString() ?? ''))
+                              : (widget.data['imageUrls'] is List)
+                                  ? List<String>.from((widget.data['imageUrls'] as List).map((e) => e?.toString() ?? ''))
+                                  : [widget.data['imageUrl'] ?? widget.data['imageData'] ?? ''],
                           height: 140,
                           width: double.infinity,
                           fit: BoxFit.cover,
@@ -1144,9 +1357,12 @@ class MyAdsView extends StatelessWidget {
                           topLeft: Radius.circular(16),
                           bottomLeft: Radius.circular(16),
                         ),
-                        child: MarketplaceImageDisplay(
-                          imageData:
-                              data['imageUrl'] ?? data['imageData'] ?? '',
+                        child: MarketplaceImageCarousel(
+                          images: (data['images'] is List)
+                              ? List<String>.from((data['images'] as List).map((e) => e?.toString() ?? ''))
+                              : (data['imageUrls'] is List)
+                                  ? List<String>.from((data['imageUrls'] as List).map((e) => e?.toString() ?? ''))
+                                  : [data['imageUrl'] ?? data['imageData'] ?? ''],
                           width: 120,
                           height: 120,
                           fit: BoxFit.cover,
@@ -1609,9 +1825,12 @@ class ItemDetailView extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: Hero(
                 tag: 'item_$itemId',
-                child: MarketplaceImageDisplay(
-                  imageData:
-                      itemData['imageUrl'] ?? itemData['imageData'] ?? '',
+                child: MarketplaceImageCarousel(
+                  images: (itemData['images'] is List)
+                      ? List<String>.from((itemData['images'] as List).map((e) => e?.toString() ?? ''))
+                      : (itemData['imageUrls'] is List)
+                          ? List<String>.from((itemData['imageUrls'] as List).map((e) => e?.toString() ?? ''))
+                          : [itemData['imageUrl'] ?? itemData['imageData'] ?? ''],
                   height: 350,
                   fit: BoxFit.cover,
                 ),
