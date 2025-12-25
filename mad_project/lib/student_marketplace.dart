@@ -53,6 +53,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
   }
 
   @override
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -84,6 +85,7 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
       },
     );
   }
+
 }
 
 class MarketplaceService {
@@ -104,8 +106,7 @@ class MarketplaceService {
         .doc(uniId)
         .collection('marketplace_items')
         .where('status', isEqualTo: 'available');
-    if (category != null && category != 'All')
-      q = q.where('category', isEqualTo: category);
+    if (category != null && category != 'All') q = q.where('category', isEqualTo: category);
     return q.snapshots();
   }
 
@@ -399,53 +400,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
             ],
           ),
 
-          // Debug bar
-          SliverToBoxAdapter(
-            child: Container(
-              width: double.infinity,
-              color: Colors.grey[100],
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'uid: ${FirebaseAuth.instance.currentUser?.uid ?? "(not signed in)"}  •  uni: ${_resolvedUniId ?? "(unresolved)"}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[800]),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      final controller =
-                          TextEditingController(text: _resolvedUniId ?? '');
-                      final val = await Get.dialog<String?>(
-                              AlertDialog(
-                                title: const Text('Set university id'),
-                          content: TextField(
-                              controller: controller,
-                              decoration: const InputDecoration(
-                                  hintText: 'Enter uniId')),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Get.back(),
-                                child: const Text('Cancel')),
-                            ElevatedButton(
-                                onPressed: () =>
-                                    Get.back(result: controller.text.trim()),
-                                child: const Text('Set')),
-                          ],
-                        ),
-                      );
-                      if (val != null)
-                        setState(
-                            () => _resolvedUniId = val.isEmpty ? null : val);
-                    },
-                    child:
-                        const Text('Set Uni', style: TextStyle(fontSize: 12)),
-                  )
-                ],
-              ),
-            ),
-          ),
+          // Debug bar removed: university selection is handled in profile/admin flows.
 
           // Sticky Search Bar
           SliverPersistentHeader(

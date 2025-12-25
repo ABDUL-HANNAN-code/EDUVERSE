@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 
+// --- Poster Model (Unchanged) ---
 class PosterModel {
   String id;
   String imageBase64;
@@ -40,6 +41,7 @@ class PosterModel {
       );
 }
 
+// --- Slideshow Widget ---
 class MarketplacePosterSlideshow extends StatefulWidget {
   const MarketplacePosterSlideshow({Key? key}) : super(key: key);
 
@@ -54,17 +56,20 @@ class _MarketplacePosterSlideshowState
   int currentSlide = 0;
   bool isAutoPlaying = true;
   Timer? _autoPlayTimer;
+  late PageController _pageController;
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
     loadPosters();
   }
 
   @override
   void dispose() {
     _autoPlayTimer?.cancel();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -77,80 +82,78 @@ class _MarketplacePosterSlideshowState
         final List<dynamic> decoded = json.decode(postersJson);
         final allPosters = decoded.map((e) => PosterModel.fromJson(e)).toList();
 
-        setState(() {
-          posters = allPosters.where((p) => p.active).toList();
-          isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            posters = allPosters.where((p) => p.active).toList();
+            isLoading = false;
+          });
+        }
 
+        // Only start autoplay if we have more than 1 poster
         if (posters.length > 1) {
           startAutoPlay();
         }
       } else {
-        setState(() => isLoading = false);
+        if (mounted) setState(() => isLoading = false);
       }
     } catch (e) {
       debugPrint('Error loading posters: $e');
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
   void startAutoPlay() {
     _autoPlayTimer?.cancel();
-    if (isAutoPlaying && posters.length > 1) {
-      _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-        if (mounted && isAutoPlaying) {
-          setState(() {
-            currentSlide = (currentSlide + 1) % posters.length;
-          });
-        }
-      });
-    }
-  }
+    if (posters.length <= 1) return;
 
-  void nextSlide() {
-    setState(() {
-      currentSlide = (currentSlide + 1) % posters.length;
-      isAutoPlaying = false;
-    });
-    _autoPlayTimer?.cancel();
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() => isAutoPlaying = true);
-        startAutoPlay();
+    debugPrint('Starting Autoplay');
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      // If user has manually paused it (by touching), skip this tick
+      if (!isAutoPlaying) return;
+
+      final next = (currentSlide + 1) % posters.length;
+      
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+        // Note: We do NOT set currentSlide here. 
+        // onPageChanged handles the state update to keep dots in sync.
       }
     });
   }
 
-  void prevSlide() {
-    setState(() {
-      currentSlide = currentSlide > 0 ? currentSlide - 1 : posters.length - 1;
-      isAutoPlaying = false;
-    });
+  void stopAutoPlay() {
     _autoPlayTimer?.cancel();
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() => isAutoPlaying = true);
-        startAutoPlay();
-      }
-    });
   }
 
-  void goToSlide(int index) {
+  // Called when user swipes manually
+  void onPageChanged(int index) {
     setState(() {
       currentSlide = index;
-      isAutoPlaying = false;
-    });
-    _autoPlayTimer?.cancel();
-    Future.delayed(const Duration(seconds: 10), () {
-      if (mounted) {
-        setState(() => isAutoPlaying = true);
-        startAutoPlay();
-      }
     });
   }
 
-  Future<void> handlePosterTap() async {
-    final poster = posters[currentSlide];
+  // Helper to pause timer when user touches the screen
+  void _onPanDown(DragDownDetails details) {
+    setState(() => isAutoPlaying = false);
+    stopAutoPlay();
+  }
+
+  // Helper to resume timer when user lifts finger
+  void _onPanCancel() {
+    setState(() => isAutoPlaying = true);
+    startAutoPlay();
+  }
+
+  Future<void> handlePosterTap(PosterModel poster) async {
     if (poster.link.isNotEmpty) {
       final uri = Uri.parse(poster.link);
       if (await canLaunchUrl(uri)) {
@@ -169,7 +172,7 @@ class _MarketplacePosterSlideshowState
     }
 
     if (posters.isEmpty) {
-      return const SizedBox.shrink(); // Don't show anything if no posters
+      return const SizedBox.shrink();
     }
 
     return Container(
@@ -177,207 +180,158 @@ class _MarketplacePosterSlideshowState
       constraints: const BoxConstraints(maxWidth: 1200),
       child: Column(
         children: [
+          // 1. The Slideshow Area
           _buildSlideshow(),
-          if (posters.length > 1) ...[
-            const SizedBox(height: 8),
-            Text(
-              '${currentSlide + 1} / ${posters.length}',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+          
+          const SizedBox(height: 12),
+          
+          // 2. The Dots (Under the poster)
+          if (posters.length > 1)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                posters.length,
+                (index) => GestureDetector(
+                  onTap: () {
+                    _pageController.animateToPage(
+                      index,
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeInOut,
+                    );
+                    // Reset autoplay timer on manual click
+                    stopAutoPlay();
+                    startAutoPlay();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: index == currentSlide ? 24 : 8, // Made active dot wider
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: index == currentSlide
+                          ? Colors.blueAccent
+                          : Colors.grey.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ],
         ],
       ),
     );
   }
 
   Widget _buildSlideshow() {
-    final poster = posters[currentSlide];
-
-    return GestureDetector(
-      onTap: poster.link.isNotEmpty ? handlePosterTap : null,
-      child: Card(
-        elevation: 8,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Stack(
-          children: [
-            // Main Image with Animation
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 500),
-              child: Container(
-                key: ValueKey(currentSlide),
-                height: 320,
-                width: double.infinity,
-                child: Image.memory(
-                  base64Decode(poster.imageBase64),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-
-            // Gradient Overlay
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.7),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Text Content
-            if (poster.title.isNotEmpty || poster.description.isNotEmpty)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (poster.title.isNotEmpty)
-                        Text(
-                          poster.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 1),
-                                blurRadius: 3,
-                                color: Colors.black45,
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (poster.description.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          poster.description,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 1),
-                                blurRadius: 3,
-                                color: Colors.black45,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-
-            // Navigation Arrows
-            if (posters.length > 1) ...[
-              Positioned(
-                left: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
+    return Card(
+      elevation: 8,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SizedBox(
+        height: 320,
+        // NotificationListener detects user swipes to pause autoplay
+        child: GestureDetector(
+          onPanDown: _onPanDown,
+          onPanCancel: _onPanCancel,
+          onPanEnd: (_) => _onPanCancel(),
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: posters.length,
+            onPageChanged: onPageChanged,
+            itemBuilder: (context, i) {
+              final p = posters[i];
+              return GestureDetector(
+                onTap: () => handlePosterTap(p),
+                child: Stack(
+                  children: [
+                    // Background Image
+                    SizedBox.expand(
+                      child: p.imageBase64.isNotEmpty 
+                      ? Image.memory(
+                          base64Decode(p.imageBase64),
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, stack) => const Center(child: Icon(Icons.broken_image)),
+                        )
+                      : Container(color: Colors.grey[300]),
                     ),
-                    child: IconButton(
-                      icon: const Icon(Icons.chevron_left, size: 28),
-                      onPressed: prevSlide,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.chevron_right, size: 28),
-                      onPressed: nextSlide,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                ),
-              ),
-            ],
 
-            // Dot Indicators
-            if (posters.length > 1)
-              Positioned(
-                bottom: 16,
-                left: 0,
-                right: 0,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    posters.length,
-                    (index) => GestureDetector(
-                      onTap: () => goToSlide(index),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        width: index == currentSlide ? 24 : 8,
-                        height: 8,
+                    // Gradient Overlay
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 200,
                         decoration: BoxDecoration(
-                          color: index == currentSlide
-                              ? Colors.white
-                              : Colors.white.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 2,
-                            ),
-                          ],
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
+
+                    // Text Content
+                    if (p.title.isNotEmpty || p.description.isNotEmpty)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (p.title.isNotEmpty)
+                                Text(
+                                  p.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(0, 1),
+                                        blurRadius: 3,
+                                        color: Colors.black45,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (p.description.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  p.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(0, 1),
+                                        blurRadius: 3,
+                                        color: Colors.black45,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
