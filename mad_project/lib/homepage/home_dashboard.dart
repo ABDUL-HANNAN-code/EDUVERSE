@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import '../shared.dart';
+import '../poster/marketplace_poster_slideshow.dart';
 
 /// Modern Home/Dashboard Module - Redesigned for Eduverse
 class HomeDashboard extends StatefulWidget {
@@ -180,6 +181,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
               child: _buildHeaderCarousel(),
             ),
 
+            // Marketplace poster slideshow (banners)
+            SliverToBoxAdapter(
+              child: MarketplacePosterSlideshow(),
+            ),
+
             // Modules Grid
             SliverToBoxAdapter(
               child: Padding(
@@ -245,7 +251,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Column(
       children: [
         SizedBox(
-          height: 180,
+          height: 190,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (index) {
@@ -405,10 +411,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
           route: '/ai-study-planner',
         ),
         ModuleItem(
-          title: 'PDF Reader & AI',
-          description: 'Read & analyze PDFs',
-          icon: Icons.picture_as_pdf,
-          gradientColors: [Color(0xFFE74C3C), Color(0xFFEC7063)],
+          title: 'Placement',
+          description: 'Placement & Internships',
+          icon: Icons.work_outline,
+          gradientColors: [Color(0xFF5E2686), Color(0xFF7D3FA0)],
+          route: '/student-placement',
         ),
         ModuleItem(
           title: 'Group Hub',
@@ -550,7 +557,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       size: 28,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   // Title
                   Text(
                     module.title,
@@ -562,18 +569,18 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  // Description
+                  const SizedBox(height: 8),
+                  // Description (larger and allow extra line)
                   Text(
                     module.description,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: const TextStyle(
+                      fontSize: 13,
                       color: AppColors.smallText,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),

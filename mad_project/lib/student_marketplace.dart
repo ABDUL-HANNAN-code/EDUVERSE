@@ -890,6 +890,37 @@ class _BannerCarouselState extends State<BannerCarousel> {
                               ),
                             ),
                           ),
+
+                        // Text overlay (title + description) - ensure captions show on banners
+                        if ((data['title'] ?? '').toString().isNotEmpty || (data['description'] ?? '').toString().isNotEmpty)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if ((data['title'] ?? '').toString().isNotEmpty)
+                                    Text((data['title'] ?? '').toString(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  if ((data['description'] ?? '').toString().isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text((data['description'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),

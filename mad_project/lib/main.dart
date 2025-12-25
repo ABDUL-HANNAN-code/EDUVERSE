@@ -19,6 +19,9 @@ import 'homepage/index.dart'; // Import Home Dashboard Module
 import 'homepage/admin_dashboard.dart';
 // AI Study Planner module
 import 'ai_study_planner/ai_study_planner.dart';
+// Placement module (student & recruiter)
+import 'timetable/PLACEMENTS/student_placement_screen.dart';
+import 'timetable/PLACEMENTS/recruiter_admin_panel.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -157,6 +160,10 @@ class UniversityApp extends StatelessWidget {
             GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
             // AI Study Planner module
             GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
+            // Placement module (student & recruiter)
+            GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
+            GetPage(name: '/recruiter-login', page: () => const RecruiterLoginScreen()),
+            GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
           ],
         );
       },
