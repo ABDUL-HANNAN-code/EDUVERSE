@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 // Ensure you have these files in your project, or remove imports if unused
-import 'shared.dart'; 
+import 'shared.dart';
 import 'auth.dart';
 
 // ==========================================
@@ -101,7 +101,16 @@ class SmartImageDisplay extends StatelessWidget {
 // ==========================================
 
 class Post {
-  final String description, uid, postId, username, postUrl, title, category, postType, location, phone;
+  final String description,
+      uid,
+      postId,
+      username,
+      postUrl,
+      title,
+      category,
+      postType,
+      location,
+      phone;
   final datePublished;
 
   Post({
@@ -119,18 +128,18 @@ class Post {
   });
 
   Map<String, dynamic> toJson() => {
-    'description': description,
-    'uid': uid,
-    'postId': postId,
-    'username': username,
-    'datePublished': datePublished,
-    'postUrl': postUrl,
-    'title': title,
-    'category': category,
-    'postType': postType,
-    'location': location,
-    'phone': phone,
-  };
+        'description': description,
+        'uid': uid,
+        'postId': postId,
+        'username': username,
+        'datePublished': datePublished,
+        'postUrl': postUrl,
+        'title': title,
+        'category': category,
+        'postType': postType,
+        'location': location,
+        'phone': phone,
+      };
 }
 
 class FirestoreMethods {
@@ -205,7 +214,8 @@ class FirestoreMethods {
 class LostAndFoundLandingPage extends StatefulWidget {
   const LostAndFoundLandingPage({super.key});
   @override
-  State<LostAndFoundLandingPage> createState() => _LostAndFoundLandingPageState();
+  State<LostAndFoundLandingPage> createState() =>
+      _LostAndFoundLandingPageState();
 }
 
 class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
@@ -238,7 +248,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
   @override
   Widget build(BuildContext context) {
     var user = AuthService().currentUser;
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFF2D1B69),
       body: SafeArea(
@@ -257,7 +267,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.school, color: Colors.white, size: 20),
+                      child: const Icon(Icons.school,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -328,8 +339,10 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                   controller: _searchCtrl,
                                   decoration: InputDecoration(
                                     hintText: 'Search',
-                                    hintStyle: TextStyle(color: Colors.grey[400]),
-                                    prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                                    hintStyle:
+                                        TextStyle(color: Colors.grey[400]),
+                                    prefixIcon: Icon(Icons.search,
+                                        color: Colors.grey[400]),
                                     border: InputBorder.none,
                                     contentPadding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -338,7 +351,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                   ),
                                   onSubmitted: (query) {
                                     if (query.isNotEmpty) {
-                                      Get.to(() => PostsListView(initialSearch: query));
+                                      Get.to(() =>
+                                          PostsListView(initialSearch: query));
                                     }
                                   },
                                 ),
@@ -370,7 +384,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                       ),
                                     ),
                                     const SizedBox(width: 4),
-                                    Icon(Icons.tune, size: 18, color: Colors.grey[700]),
+                                    Icon(Icons.tune,
+                                        size: 18, color: Colors.grey[700]),
                                   ],
                                 ),
                               ),
@@ -386,7 +401,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                           children: [
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => Get.to(() => const CreatePostView()),
+                                onTap: () =>
+                                    Get.to(() => const CreatePostView()),
                                 child: Container(
                                   height: 160,
                                   decoration: BoxDecoration(
@@ -432,7 +448,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                         'Post an advert for an item.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: const Color(0xFF2D1B69).withOpacity(0.7),
+                                          color: const Color(0xFF2D1B69)
+                                              .withOpacity(0.7),
                                           fontSize: 11,
                                         ),
                                       ),
@@ -444,7 +461,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                             const SizedBox(width: 16),
                             Expanded(
                               child: GestureDetector(
-                                onTap: () => Get.to(() => const PostsListView()),
+                                onTap: () =>
+                                    Get.to(() => const PostsListView()),
                                 child: Container(
                                   height: 160,
                                   decoration: BoxDecoration(
@@ -490,7 +508,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                         'Search for lost\nbelongings.',
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
-                                          color: const Color(0xFF8B6914).withOpacity(0.7),
+                                          color: const Color(0xFF8B6914)
+                                              .withOpacity(0.7),
                                           fontSize: 11,
                                         ),
                                       ),
@@ -542,24 +561,29 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                               .limit(10)
                               .snapshots(),
                           builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
                               return const Center(
-                                child: Text('No items yet', style: TextStyle(color: Colors.grey)),
+                                  child: CircularProgressIndicator());
+                            }
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return const Center(
+                                child: Text('No items yet',
+                                    style: TextStyle(color: Colors.grey)),
                               );
                             }
 
                             final docs = snapshot.data!.docs;
                             return ListView.builder(
                               scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
                               itemCount: docs.length,
                               itemBuilder: (context, index) {
                                 final doc = docs[index];
                                 final data = doc.data() as Map<String, dynamic>;
-                                
+
                                 DateTime date;
                                 final ts = data['datePublished'];
                                 if (ts is Timestamp) {
@@ -567,14 +591,16 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                 } else if (ts is DateTime) {
                                   date = ts;
                                 } else {
-                                  date = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+                                  date = DateTime.tryParse(ts.toString()) ??
+                                      DateTime.now();
                                 }
 
                                 final postType = data['postType'] ?? 'Found';
                                 final isLost = postType == 'Lost';
 
                                 return GestureDetector(
-                                  onTap: () => Get.to(() => PostDetailView(snap: doc)),
+                                  onTap: () =>
+                                      Get.to(() => PostDetailView(snap: doc)),
                                   child: Container(
                                     width: 140,
                                     margin: const EdgeInsets.only(right: 16),
@@ -590,10 +616,12 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                       ],
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         ClipRRect(
-                                          borderRadius: const BorderRadius.vertical(
+                                          borderRadius:
+                                              const BorderRadius.vertical(
                                             top: Radius.circular(16),
                                           ),
                                           child: SmartImageDisplay(
@@ -606,7 +634,8 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                         Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 data['title'] ?? 'No title',
@@ -624,9 +653,9 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w500,
-                                                  color: isLost 
-                                                    ? const Color(0xFFE53935) 
-                                                    : const Color(0xFF43A047),
+                                                  color: isLost
+                                                      ? const Color(0xFFE53935)
+                                                      : const Color(0xFF43A047),
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
@@ -669,7 +698,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
 class PostsListView extends StatefulWidget {
   final String? initialSearch;
   const PostsListView({super.key, this.initialSearch});
-  
+
   @override
   State<PostsListView> createState() => _PostsListViewState();
 }
@@ -681,7 +710,8 @@ class _PostsListViewState extends State<PostsListView> {
   bool sortByEarliest = false;
   bool showFilters = false;
 
-  List<String> categories() => ['All', 'Gadgets', 'Books', 'Id-Card', 'Bottle', 'Other'];
+  List<String> categories() =>
+      ['All', 'Gadgets', 'Books', 'Id-Card', 'Bottle', 'Other'];
   List<String> types() => ['All', 'Found', 'Lost'];
 
   @override
@@ -739,7 +769,8 @@ class _PostsListViewState extends State<PostsListView> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const Expanded(
@@ -759,8 +790,8 @@ class _PostsListViewState extends State<PostsListView> {
                     child: CircleAvatar(
                       radius: 18,
                       backgroundImage: NetworkImage(
-                        AuthService().currentUser?.photoURL ?? 
-                        "https://via.placeholder.com/150",
+                        AuthService().currentUser?.photoURL ??
+                            "https://via.placeholder.com/150",
                       ),
                     ),
                   ),
@@ -803,7 +834,8 @@ class _PostsListViewState extends State<PostsListView> {
                                 decoration: InputDecoration(
                                   hintText: 'Search',
                                   hintStyle: TextStyle(color: Colors.grey[400]),
-                                  prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                                  prefixIcon: Icon(Icons.search,
+                                      color: Colors.grey[400]),
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 16,
@@ -816,11 +848,14 @@ class _PostsListViewState extends State<PostsListView> {
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            onTap: () => setState(() => showFilters = !showFilters),
+                            onTap: () =>
+                                setState(() => showFilters = !showFilters),
                             child: Container(
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: showFilters ? const Color(0xFF2D1B69) : Colors.white,
+                                color: showFilters
+                                    ? const Color(0xFF2D1B69)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
@@ -837,14 +872,18 @@ class _PostsListViewState extends State<PostsListView> {
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
-                                      color: showFilters ? Colors.white : Colors.black,
+                                      color: showFilters
+                                          ? Colors.white
+                                          : Colors.black,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
                                   Icon(
                                     Icons.tune,
                                     size: 18,
-                                    color: showFilters ? Colors.white : Colors.grey[700],
+                                    color: showFilters
+                                        ? Colors.white
+                                        : Colors.grey[700],
                                   ),
                                 ],
                               ),
@@ -889,16 +928,17 @@ class _PostsListViewState extends State<PostsListView> {
                                 children: categories().map((cat) {
                                   final isSelected = selectedCategory == cat;
                                   return GestureDetector(
-                                    onTap: () => setState(() => selectedCategory = cat),
+                                    onTap: () =>
+                                        setState(() => selectedCategory = cat),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isSelected 
-                                          ? const Color(0xFF2D1B69) 
-                                          : const Color(0xFFF5F5F5),
+                                        color: isSelected
+                                            ? const Color(0xFF2D1B69)
+                                            : const Color(0xFFF5F5F5),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -906,7 +946,9 @@ class _PostsListViewState extends State<PostsListView> {
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
-                                          color: isSelected ? Colors.white : Colors.black87,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black87,
                                         ),
                                       ),
                                     ),
@@ -929,16 +971,17 @@ class _PostsListViewState extends State<PostsListView> {
                                 children: types().map((type) {
                                   final isSelected = selectedType == type;
                                   return GestureDetector(
-                                    onTap: () => setState(() => selectedType = type),
+                                    onTap: () =>
+                                        setState(() => selectedType = type),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: isSelected 
-                                          ? const Color(0xFF2D1B69) 
-                                          : const Color(0xFFF5F5F5),
+                                        color: isSelected
+                                            ? const Color(0xFF2D1B69)
+                                            : const Color(0xFFF5F5F5),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -946,7 +989,9 @@ class _PostsListViewState extends State<PostsListView> {
                                         style: TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
-                                          color: isSelected ? Colors.white : Colors.black87,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : Colors.black87,
                                         ),
                                       ),
                                     ),
@@ -962,27 +1007,42 @@ class _PostsListViewState extends State<PostsListView> {
                     // List
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance.collection('posts').snapshots(),
+                        stream: FirebaseFirestore.instance
+                            .collection('posts')
+                            .snapshots(),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-                          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
                             return const Center(
-                              child: Text('No items found', style: TextStyle(color: Colors.grey)),
+                                child: CircularProgressIndicator());
+                          }
+                          if (!snapshot.hasData ||
+                              snapshot.data!.docs.isEmpty) {
+                            return const Center(
+                              child: Text('No items found',
+                                  style: TextStyle(color: Colors.grey)),
                             );
                           }
 
-                          List<QueryDocumentSnapshot> docs = snapshot.data!.docs;
-                          List<QueryDocumentSnapshot> filtered = docs.where((doc) {
+                          List<QueryDocumentSnapshot> docs =
+                              snapshot.data!.docs;
+                          List<QueryDocumentSnapshot> filtered =
+                              docs.where((doc) {
                             final data = doc.data() as Map<String, dynamic>;
                             // Normalize category values for robust matching
-                            final docCategory = (data['category'] ?? '').toString().trim().toLowerCase();
-                            final selCategory = selectedCategory.toString().trim().toLowerCase();
-                            if (selCategory != 'all' && docCategory != selCategory) {
+                            final docCategory = (data['category'] ?? '')
+                                .toString()
+                                .trim()
+                                .toLowerCase();
+                            final selCategory = selectedCategory
+                                .toString()
+                                .trim()
+                                .toLowerCase();
+                            if (selCategory != 'all' &&
+                                docCategory != selCategory) {
                               return false;
                             }
-                            if (selectedType != 'All' && 
+                            if (selectedType != 'All' &&
                                 (data['postType'] ?? 'Found') != selectedType) {
                               return false;
                             }
@@ -1003,28 +1063,33 @@ class _PostsListViewState extends State<PostsListView> {
                             } else if (ta is DateTime) {
                               da = ta;
                             } else {
-                              da = DateTime.tryParse(ta.toString()) ?? DateTime.now();
+                              da = DateTime.tryParse(ta.toString()) ??
+                                  DateTime.now();
                             }
                             if (tb is Timestamp) {
                               db = tb.toDate();
                             } else if (tb is DateTime) {
                               db = tb;
                             } else {
-                              db = DateTime.tryParse(tb.toString()) ?? DateTime.now();
+                              db = DateTime.tryParse(tb.toString()) ??
+                                  DateTime.now();
                             }
-                            return sortByEarliest ? da.compareTo(db) : db.compareTo(da);
+                            return sortByEarliest
+                                ? da.compareTo(db)
+                                : db.compareTo(da);
                           });
 
                           if (filtered.isEmpty) {
                             return const Center(
-                              child: Text('No items match filters', 
-                                style: TextStyle(color: Colors.grey)),
+                              child: Text('No items match filters',
+                                  style: TextStyle(color: Colors.grey)),
                             );
                           }
 
                           return GridView.builder(
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               childAspectRatio: 0.75,
                               crossAxisSpacing: 16,
@@ -1034,7 +1099,7 @@ class _PostsListViewState extends State<PostsListView> {
                             itemBuilder: (context, index) {
                               final doc = filtered[index];
                               final data = doc.data() as Map<String, dynamic>;
-                              
+
                               DateTime date;
                               final ts = data['datePublished'];
                               if (ts is Timestamp) {
@@ -1042,14 +1107,16 @@ class _PostsListViewState extends State<PostsListView> {
                               } else if (ts is DateTime) {
                                 date = ts;
                               } else {
-                                date = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+                                date = DateTime.tryParse(ts.toString()) ??
+                                    DateTime.now();
                               }
 
                               final postType = data['postType'] ?? 'Found';
                               final isLost = postType == 'Lost';
 
                               return GestureDetector(
-                                onTap: () => Get.to(() => PostDetailView(snap: doc)),
+                                onTap: () =>
+                                    Get.to(() => PostDetailView(snap: doc)),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -1063,10 +1130,12 @@ class _PostsListViewState extends State<PostsListView> {
                                     ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       ClipRRect(
-                                        borderRadius: const BorderRadius.vertical(
+                                        borderRadius:
+                                            const BorderRadius.vertical(
                                           top: Radius.circular(16),
                                         ),
                                         child: SmartImageDisplay(
@@ -1080,7 +1149,8 @@ class _PostsListViewState extends State<PostsListView> {
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 data['title'] ?? 'No title',
@@ -1098,9 +1168,9 @@ class _PostsListViewState extends State<PostsListView> {
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w500,
-                                                  color: isLost 
-                                                    ? const Color(0xFFE53935) 
-                                                    : const Color(0xFF43A047),
+                                                  color: isLost
+                                                      ? const Color(0xFFE53935)
+                                                      : const Color(0xFF43A047),
                                                 ),
                                               ),
                                               const Spacer(),
@@ -1167,20 +1237,21 @@ class _CreatePostViewState extends State<CreatePostView> {
   post() async {
     if (_file == null) {
       Get.snackbar("Error", "Please select an image",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
       return;
     }
     if (_phone.text.isEmpty) {
       Get.snackbar("Error", "Please enter your phone number",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
       return;
     }
     if (!PhoneValidator.isValidPhone(_phone.text)) {
-      Get.snackbar("Error", "Phone format invalid. Use +923115428907 or 03115428907",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+      Get.snackbar(
+          "Error", "Phone format invalid. Use +923115428907 or 03115428907",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
       return;
     }
     setState(() => isLoading = true);
@@ -1203,18 +1274,18 @@ class _CreatePostViewState extends State<CreatePostView> {
       if (res == "Success") {
         Get.back();
         Get.snackbar("Success", "Post created",
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green.shade100);
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade100);
       } else {
         Get.snackbar("Error", res,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.shade100);
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red.shade100);
       }
     } catch (e) {
       setState(() => isLoading = false);
       Get.snackbar("Error", e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
     }
   }
 
@@ -1238,7 +1309,8 @@ class _CreatePostViewState extends State<CreatePostView> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const Expanded(
@@ -1268,164 +1340,182 @@ class _CreatePostViewState extends State<CreatePostView> {
                   ),
                 ),
                 child: isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 10),
-                          GestureDetector(
-                            onTap: selectImage,
-                            child: Container(
-                              height: 200,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.grey[300]!),
-                              ),
-                              child: _file == null
-                                ? Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.add_photo_alternate, 
-                                        size: 50, color: Colors.grey[400]),
-                                      const SizedBox(height: 8),
-                                      Text('Tap to add photo', 
-                                        style: TextStyle(color: Colors.grey[600])),
-                                    ],
-                                  )
-                                : ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.memory(_file!, fit: BoxFit.cover),
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'Type',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => postType = "Found"),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: postType == "Found" 
-                                        ? const Color(0xFF2D1B69) 
-                                        : Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: postType == "Found" 
-                                          ? const Color(0xFF2D1B69) 
-                                          : Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'Found',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: postType == "Found" 
-                                            ? Colors.white 
-                                            : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => setState(() => postType = "Lost"),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: postType == "Lost" 
-                                        ? const Color(0xFF2D1B69) 
-                                        : Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: postType == "Lost" 
-                                          ? const Color(0xFF2D1B69) 
-                                          : Colors.grey[300]!,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'Lost',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: postType == "Lost" 
-                                            ? Colors.white 
-                                            : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          _buildTextField('Category', null, enabled: true, 
-                            suffix: DropdownButton<String>(
-                              value: category,
-                              underline: const SizedBox(),
-                              items: ['Gadgets', 'Books', 'Id-Card', 'Bottle', 'Other']
-                                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                                .toList(),
-                              onChanged: (v) => setState(() => category = v!),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField('Title', _title),
-                          const SizedBox(height: 16),
-                          _buildTextField('Description', _desc, maxLines: 3),
-                          const SizedBox(height: 16),
-                          _buildTextField('Location', _location),
-                          const SizedBox(height: 16),
-                          _buildTextField('Phone Number', _phone, 
-                            hint: '+923115428907 or 03115428907',
-                            keyboardType: TextInputType.phone),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: post,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2D1B69),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'Post Ad',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            GestureDetector(
+                              onTap: selectImage,
+                              child: Container(
+                                height: 200,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
                                   color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: _file == null
+                                    ? Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.add_photo_alternate,
+                                              size: 50,
+                                              color: Colors.grey[400]),
+                                          const SizedBox(height: 8),
+                                          Text('Tap to add photo',
+                                              style: TextStyle(
+                                                  color: Colors.grey[600])),
+                                        ],
+                                      )
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image.memory(_file!,
+                                            fit: BoxFit.cover),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Type',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        setState(() => postType = "Found"),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: postType == "Found"
+                                            ? const Color(0xFF2D1B69)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: postType == "Found"
+                                              ? const Color(0xFF2D1B69)
+                                              : Colors.grey[300]!,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          'Found',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: postType == "Found"
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        setState(() => postType = "Lost"),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: postType == "Lost"
+                                            ? const Color(0xFF2D1B69)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: postType == "Lost"
+                                              ? const Color(0xFF2D1B69)
+                                              : Colors.grey[300]!,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          'Lost',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: postType == "Lost"
+                                                ? Colors.white
+                                                : Colors.black87,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            _buildTextField(
+                              'Category',
+                              null,
+                              enabled: true,
+                              suffix: DropdownButton<String>(
+                                value: category,
+                                underline: const SizedBox(),
+                                items: [
+                                  'Gadgets',
+                                  'Books',
+                                  'Id-Card',
+                                  'Bottle',
+                                  'Other'
+                                ]
+                                    .map((e) => DropdownMenuItem(
+                                        value: e, child: Text(e)))
+                                    .toList(),
+                                onChanged: (v) => setState(() => category = v!),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField('Title', _title),
+                            const SizedBox(height: 16),
+                            _buildTextField('Description', _desc, maxLines: 3),
+                            const SizedBox(height: 16),
+                            _buildTextField('Location', _location),
+                            const SizedBox(height: 16),
+                            _buildTextField('Phone Number', _phone,
+                                hint: '+923115428907 or 03115428907',
+                                keyboardType: TextInputType.phone),
+                            const SizedBox(height: 32),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: post,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2D1B69),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Text(
+                                  'Post Ad',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
               ),
             ),
           ],
@@ -1511,7 +1601,8 @@ class PostDetailView extends StatelessWidget {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const Expanded(
@@ -1600,8 +1691,8 @@ class PostDetailView extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: snap['postType'] == 'Lost'
-                                  ? Colors.red.shade50
-                                  : Colors.green.shade50,
+                                    ? Colors.red.shade50
+                                    : Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -1610,8 +1701,8 @@ class PostDetailView extends StatelessWidget {
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: snap['postType'] == 'Lost'
-                                    ? const Color(0xFFE53935)
-                                    : const Color(0xFF43A047),
+                                      ? const Color(0xFFE53935)
+                                      : const Color(0xFF43A047),
                                 ),
                               ),
                             ),
@@ -1627,8 +1718,8 @@ class PostDetailView extends StatelessWidget {
                             const SizedBox(height: 24),
                             Row(
                               children: [
-                                const Icon(Icons.location_on, 
-                                  size: 20, color: Color(0xFF666666)),
+                                const Icon(Icons.location_on,
+                                    size: 20, color: Color(0xFF666666)),
                                 const SizedBox(width: 8),
                                 Text(
                                   snap['location'],
@@ -1646,15 +1737,18 @@ class PostDetailView extends StatelessWidget {
                                 height: 50,
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    String phone = (snap['phone'] ?? '').toString().trim();
+                                    String phone =
+                                        (snap['phone'] ?? '').toString().trim();
                                     if (phone.isEmpty) {
-                                      Get.snackbar("Error", "Phone number not available",
-                                        snackPosition: SnackPosition.BOTTOM);
+                                      Get.snackbar(
+                                          "Error", "Phone number not available",
+                                          snackPosition: SnackPosition.BOTTOM);
                                       return;
                                     }
 
                                     // Try WhatsApp first (same behaviour as marketplace module)
-                                    final waUri = Uri.parse('https://wa.me/$phone');
+                                    final waUri =
+                                        Uri.parse('https://wa.me/$phone');
                                     try {
                                       await launchUrl(waUri);
                                     } catch (e) {
@@ -1663,8 +1757,10 @@ class PostDetailView extends StatelessWidget {
                                       try {
                                         await launchUrl(telUri);
                                       } catch (e2) {
-                                        Get.snackbar("Error", "Could not open contact method",
-                                          snackPosition: SnackPosition.BOTTOM);
+                                        Get.snackbar("Error",
+                                            "Could not open contact method",
+                                            snackPosition:
+                                                SnackPosition.BOTTOM);
                                       }
                                     }
                                   },
@@ -1717,12 +1813,12 @@ class PostDetailView extends StatelessWidget {
                 await FirestoreMethods().deletePost(snap['postId']);
                 Get.back();
                 Get.snackbar("Success", "Post deleted",
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.green.shade100);
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.green.shade100);
               } catch (e) {
                 Get.snackbar("Error", "Failed to delete post: $e",
-                  snackPosition: SnackPosition.BOTTOM,
-                  backgroundColor: Colors.red.shade100);
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.red.shade100);
               }
             },
             child: const Text("Delete", style: TextStyle(color: Colors.red)),
@@ -1773,17 +1869,20 @@ class _EditPostViewState extends State<EditPostView> {
   }
 
   _updatePost() async {
-    if (_title.text.isEmpty || _desc.text.isEmpty || 
-        _location.text.isEmpty || _phone.text.isEmpty) {
+    if (_title.text.isEmpty ||
+        _desc.text.isEmpty ||
+        _location.text.isEmpty ||
+        _phone.text.isEmpty) {
       Get.snackbar("Error", "All fields are required",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
       return;
     }
     if (!PhoneValidator.isValidPhone(_phone.text)) {
-      Get.snackbar("Error", "Phone format invalid. Use +923115428907 or 03115428907",
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+      Get.snackbar(
+          "Error", "Phone format invalid. Use +923115428907 or 03115428907",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
       return;
     }
     setState(() => isLoading = true);
@@ -1801,18 +1900,18 @@ class _EditPostViewState extends State<EditPostView> {
       if (res == "Success") {
         Get.back();
         Get.snackbar("Success", "Post updated",
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green.shade100);
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade100);
       } else {
         Get.snackbar("Error", res,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.shade100);
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red.shade100);
       }
     } catch (e) {
       setState(() => isLoading = false);
       Get.snackbar("Error", e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade100);
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
     }
   }
 
@@ -1836,7 +1935,8 @@ class _EditPostViewState extends State<EditPostView> {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const Expanded(
@@ -1871,13 +1971,23 @@ class _EditPostViewState extends State<EditPostView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 10),
-                      _buildTextField('Category', null, enabled: true,
-                          suffix: DropdownButton<String>(
+                      _buildTextField(
+                        'Category',
+                        null,
+                        enabled: true,
+                        suffix: DropdownButton<String>(
                           value: category,
                           underline: const SizedBox(),
-                          items: ['Gadgets', 'Books', 'Id-Card', 'Bottle', 'Other']
-                            .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                            .toList(),
+                          items: [
+                            'Gadgets',
+                            'Books',
+                            'Id-Card',
+                            'Bottle',
+                            'Other'
+                          ]
+                              .map((e) =>
+                                  DropdownMenuItem(value: e, child: Text(e)))
+                              .toList(),
                           onChanged: (v) => setState(() => category = v!),
                         ),
                       ),
@@ -1889,33 +1999,33 @@ class _EditPostViewState extends State<EditPostView> {
                       _buildTextField('Location', _location),
                       const SizedBox(height: 16),
                       _buildTextField('Phone Number', _phone,
-                        hint: '+923115428907 or 03115428907',
-                        keyboardType: TextInputType.phone),
+                          hint: '+923115428907 or 03115428907',
+                          keyboardType: TextInputType.phone),
                       const SizedBox(height: 32),
                       isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _updatePost,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2D1B69),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                          ? const Center(child: CircularProgressIndicator())
+                          : SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _updatePost,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2D1B69),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
                                 ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'Update Post',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                                child: const Text(
+                                  'Update Post',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
                     ],
                   ),
                 ),
@@ -1983,7 +2093,7 @@ class ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var user = AuthService().currentUser!;
-    
+
     return Scaffold(
       backgroundColor: const Color(0xFF2D1B69),
       body: SafeArea(
@@ -2002,7 +2112,8 @@ class ProfileView extends StatelessWidget {
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      child: const Icon(Icons.arrow_back,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                   const Expanded(
@@ -2099,29 +2210,31 @@ class ProfileView extends StatelessWidget {
                     Expanded(
                       child: StreamBuilder(
                         stream: FirebaseFirestore.instance
-                          .collection('posts')
-                          .where('uid', isEqualTo: user.uid)
-                          .snapshots(),
+                            .collection('posts')
+                            .where('uid', isEqualTo: user.uid)
+                            .snapshots(),
                         builder: (context, snapshot) {
                           if (!snapshot.hasData) {
-                            return const Center(child: CircularProgressIndicator());
+                            return const Center(
+                                child: CircularProgressIndicator());
                           }
-                          
+
                           if (snapshot.data!.docs.isEmpty) {
                             return const Center(
-                              child: Text('No posts yet', 
-                                style: TextStyle(color: Colors.grey)),
+                              child: Text('No posts yet',
+                                  style: TextStyle(color: Colors.grey)),
                             );
                           }
 
                           return ListView.separated(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: snapshot.data!.docs.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final doc = snapshot.data!.docs[index];
                               final data = doc.data() as Map<String, dynamic>;
-                              
+
                               DateTime date;
                               final ts = data['datePublished'];
                               if (ts is Timestamp) {
@@ -2129,21 +2242,28 @@ class ProfileView extends StatelessWidget {
                               } else if (ts is DateTime) {
                                 date = ts;
                               } else {
-                                date = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+                                date = DateTime.tryParse(ts.toString()) ??
+                                    DateTime.now();
                               }
 
                               final d = DateTime.now().difference(date);
                               String ago;
-                              if (d.inSeconds < 60) ago = '${d.inSeconds}s ago';
-                              else if (d.inMinutes < 60) ago = '${d.inMinutes}m ago';
-                              else if (d.inHours < 24) ago = '${d.inHours}h ago';
-                              else if (d.inDays < 7) ago = '${d.inDays}d ago';
-                              else ago = '${date.day}/${date.month}/${date.year}';
+                              if (d.inSeconds < 60)
+                                ago = '${d.inSeconds}s ago';
+                              else if (d.inMinutes < 60)
+                                ago = '${d.inMinutes}m ago';
+                              else if (d.inHours < 24)
+                                ago = '${d.inHours}h ago';
+                              else if (d.inDays < 7)
+                                ago = '${d.inDays}d ago';
+                              else
+                                ago = '${date.day}/${date.month}/${date.year}';
 
                               final postType = data['postType'] ?? 'Found';
 
                               return GestureDetector(
-                                onTap: () => Get.to(() => PostDetailView(snap: doc)),
+                                onTap: () =>
+                                    Get.to(() => PostDetailView(snap: doc)),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -2190,7 +2310,8 @@ class ProfileView extends StatelessWidget {
                                         if (v == 'edit') {
                                           Get.to(() => EditPostView(snap: doc));
                                         } else if (v == 'delete') {
-                                          final confirmed = await Get.dialog<bool>(
+                                          final confirmed =
+                                              await Get.dialog<bool>(
                                             AlertDialog(
                                               title: const Text('Delete Post'),
                                               content: const Text(
@@ -2198,14 +2319,17 @@ class ProfileView extends StatelessWidget {
                                               ),
                                               actions: [
                                                 TextButton(
-                                                  onPressed: () => Get.back(result: false),
+                                                  onPressed: () =>
+                                                      Get.back(result: false),
                                                   child: const Text('Cancel'),
                                                 ),
                                                 TextButton(
-                                                  onPressed: () => Get.back(result: true),
+                                                  onPressed: () =>
+                                                      Get.back(result: true),
                                                   child: const Text(
                                                     'Delete',
-                                                    style: TextStyle(color: Colors.red),
+                                                    style: TextStyle(
+                                                        color: Colors.red),
                                                   ),
                                                 ),
                                               ],
@@ -2213,22 +2337,30 @@ class ProfileView extends StatelessWidget {
                                           );
                                           if (confirmed == true) {
                                             try {
-                                              await FirestoreMethods().deletePost(
+                                              await FirestoreMethods()
+                                                  .deletePost(
                                                 data['postId'] ?? doc.id,
                                               );
-                                              Get.snackbar('Success', 'Post deleted',
-                                                snackPosition: SnackPosition.BOTTOM,
-                                                backgroundColor: Colors.green.shade100);
+                                              Get.snackbar(
+                                                  'Success', 'Post deleted',
+                                                  snackPosition:
+                                                      SnackPosition.BOTTOM,
+                                                  backgroundColor:
+                                                      Colors.green.shade100);
                                             } catch (e) {
-                                              Get.snackbar('Error', 'Failed to delete: $e',
-                                                snackPosition: SnackPosition.BOTTOM,
-                                                backgroundColor: Colors.red.shade100);
+                                              Get.snackbar('Error',
+                                                  'Failed to delete: $e',
+                                                  snackPosition:
+                                                      SnackPosition.BOTTOM,
+                                                  backgroundColor:
+                                                      Colors.red.shade100);
                                             }
                                           }
                                         }
                                       },
                                       itemBuilder: (context) => [
-                                        const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                        const PopupMenuItem(
+                                            value: 'edit', child: Text('Edit')),
                                         const PopupMenuItem(
                                           value: 'delete',
                                           child: Text('Delete'),

@@ -85,7 +85,6 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
       },
     );
   }
-
 }
 
 class MarketplaceService {
@@ -106,7 +105,8 @@ class MarketplaceService {
         .doc(uniId)
         .collection('marketplace_items')
         .where('status', isEqualTo: 'available');
-    if (category != null && category != 'All') q = q.where('category', isEqualTo: category);
+    if (category != null && category != 'All')
+      q = q.where('category', isEqualTo: category);
     return q.snapshots();
   }
 

@@ -112,19 +112,19 @@ class _MarketplacePosterSlideshowState
         timer.cancel();
         return;
       }
-      
+
       // If user has manually paused it (by touching), skip this tick
       if (!isAutoPlaying) return;
 
       final next = (currentSlide + 1) % posters.length;
-      
+
       if (_pageController.hasClients) {
         _pageController.animateToPage(
           next,
           duration: const Duration(milliseconds: 500),
           curve: Curves.easeInOut,
         );
-        // Note: We do NOT set currentSlide here. 
+        // Note: We do NOT set currentSlide here.
         // onPageChanged handles the state update to keep dots in sync.
       }
     });
@@ -182,9 +182,9 @@ class _MarketplacePosterSlideshowState
         children: [
           // 1. The Slideshow Area
           _buildSlideshow(),
-          
+
           const SizedBox(height: 12),
-          
+
           // 2. The Dots (Under the poster)
           if (posters.length > 1)
             Row(
@@ -205,7 +205,8 @@ class _MarketplacePosterSlideshowState
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: index == currentSlide ? 24 : 8, // Made active dot wider
+                    width:
+                        index == currentSlide ? 24 : 8, // Made active dot wider
                     height: 8,
                     decoration: BoxDecoration(
                       color: index == currentSlide
@@ -248,13 +249,14 @@ class _MarketplacePosterSlideshowState
                   children: [
                     // Background Image
                     SizedBox.expand(
-                      child: p.imageBase64.isNotEmpty 
-                      ? Image.memory(
-                          base64Decode(p.imageBase64),
-                          fit: BoxFit.cover,
-                          errorBuilder: (ctx, err, stack) => const Center(child: Icon(Icons.broken_image)),
-                        )
-                      : Container(color: Colors.grey[300]),
+                      child: p.imageBase64.isNotEmpty
+                          ? Image.memory(
+                              base64Decode(p.imageBase64),
+                              fit: BoxFit.cover,
+                              errorBuilder: (ctx, err, stack) =>
+                                  const Center(child: Icon(Icons.broken_image)),
+                            )
+                          : Container(color: Colors.grey[300]),
                     ),
 
                     // Gradient Overlay
