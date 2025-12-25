@@ -88,7 +88,13 @@ class ComplaintService {
     required String deptId,
     ComplaintStatus? statusFilter,
   }) {
-    Query query = _firestore.collection(_collectionName).where('uniId', isEqualTo: uniId);
+    // Build base query. Only apply `uniId` filter if provided — passing an
+    // empty string will otherwise restrict results to uniId == ''.
+    Query query = _firestore.collection(_collectionName);
+
+    if (uniId.isNotEmpty) {
+      query = query.where('uniId', isEqualTo: uniId);
+    }
 
     if (deptId.isNotEmpty) {
       query = query.where('deptId', isEqualTo: deptId);
@@ -99,6 +105,24 @@ class ComplaintService {
     }
 
     return query.orderBy('createdAt', descending: true).snapshots().map((snapshot) => snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList());
+  }
+
+  // Fallback: fetch a small set of recent complaints without composite filters.
+  // Useful when composite index is missing or building — returns an empty
+  // list on failure so callers can gracefully handle it.
+  Future<List<ComplaintModel>> getRecentComplaintsFallback({int limit = 20}) async {
+    try {
+      final snapshot = await _firestore.collection(_collectionName)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.map((doc) => ComplaintModel.fromFirestore(doc)).toList();
+    } catch (e) {
+      // Log and return empty so UI can decide what to show.
+      print('ComplaintService: fallback fetch failed: $e');
+      return [];
+    }
   }
 
   // Update complaint status

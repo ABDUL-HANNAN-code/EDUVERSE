@@ -1,7 +1,10 @@
 // lib/complaints/controllers/admin_complaint_controller.dart
 
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/complaint_model.dart';
@@ -17,6 +20,7 @@ class AdminComplaintController extends GetxController {
   final replyController = TextEditingController();
   final selectedStatus = Rx<ComplaintStatus?>(null);
   final selectedUniId = ''.obs;
+  StreamSubscription<List<ComplaintModel>>? _complaintSub;
 
   @override
   void onInit() {
@@ -27,6 +31,7 @@ class AdminComplaintController extends GetxController {
   @override
   void onClose() {
     replyController.dispose();
+    _complaintSub?.cancel();
     super.onClose();
   }
 
@@ -57,15 +62,71 @@ class AdminComplaintController extends GetxController {
     }
 
     try {
-      _service.getAdminComplaints(uniId: uniId, deptId: deptId, statusFilter: currentFilter.value).listen((dataList) {
+      // Cancel any existing subscription before creating a new one (prevents
+      // multiple listeners and stale state after reload/login).
+      await _complaintSub?.cancel();
+
+      print('AdminComplaintController: loading complaints for uid=$uid uniId="$uniId" deptId="$deptId" filter=${currentFilter.value}');
+
+      _complaintSub = _service
+          .getAdminComplaints(uniId: uniId, deptId: deptId, statusFilter: currentFilter.value)
+          .listen((dataList) {
+        print('AdminComplaintController: received ${dataList.length} complaints');
         complaints.value = dataList;
         isLoading.value = false;
       }, onError: (error) {
         isLoading.value = false;
-        Get.snackbar('Error', 'Failed to load complaints', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.shade100, colorText: Colors.red.shade900);
+        print('AdminComplaintController: error loading complaints: $error');
+        String message = 'Failed to load complaints';
+        if (error is FirebaseException) {
+          message = '${message}: ${error.message}';
+          // If Firestore indicates an index is required, extract the URL and
+          // offer to open it in the browser so the developer can create it.
+          final msg = error.message ?? '';
+            final urlMatch = RegExp(r'(https?:\/\/\S*indexes?\S*)').firstMatch(msg);
+          if (urlMatch != null) {
+            final url = urlMatch.group(0)!;
+            print('AdminComplaintController: index URL detected: $url');
+            Get.defaultDialog(
+              title: 'Index Required',
+              middleText: 'A Firestore composite index is required to run this query. Open the console to create it?',
+              textConfirm: 'Open Index',
+              onConfirm: () async {
+                Get.back();
+                try {
+                  final uri = Uri.parse(url);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } else {
+                    Get.snackbar('Error', 'Cannot open browser for index link', snackPosition: SnackPosition.BOTTOM);
+                  }
+                } catch (e) {
+                  Get.snackbar('Error', 'Failed to open index link: $e', snackPosition: SnackPosition.BOTTOM);
+                }
+              },
+              textCancel: 'Cancel',
+            );
+          }
+        } else if (error != null) {
+          message = '${message}: $error';
+        }
+        Get.snackbar('Error', message, snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.shade100, colorText: Colors.red.shade900);
+
+        // Attempt a lightweight fallback fetch (recent complaints) so the
+        // admin sees something while an index is created or building.
+        _service.getRecentComplaintsFallback(limit: 20).then((fallbackList) {
+          if (fallbackList.isNotEmpty) {
+            print('AdminComplaintController: fallback returned ${fallbackList.length} complaints');
+            complaints.value = fallbackList;
+            Get.snackbar('Notice', 'Showing recent complaints while index builds', snackPosition: SnackPosition.BOTTOM);
+          } else {
+            print('AdminComplaintController: fallback returned no complaints');
+          }
+        });
       });
     } catch (e) {
       isLoading.value = false;
+      print('AdminComplaintController: exception in loadComplaints: $e');
       Get.snackbar('Error', 'Failed to load complaints: $e', snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.shade100, colorText: Colors.red.shade900);
     }
   }
