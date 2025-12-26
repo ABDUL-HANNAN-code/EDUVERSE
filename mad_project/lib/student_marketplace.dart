@@ -788,7 +788,8 @@ class MarketplaceImageCarousel extends StatefulWidget {
   });
 
   @override
-  State<MarketplaceImageCarousel> createState() => _MarketplaceImageCarouselState();
+  State<MarketplaceImageCarousel> createState() =>
+      _MarketplaceImageCarouselState();
 }
 
 // BannerCarousel: shows a list of banner documents (QueryDocumentSnapshot list)
@@ -797,7 +798,8 @@ class BannerCarousel extends StatefulWidget {
   final List<QueryDocumentSnapshot> banners;
   final bool isAdmin;
   final Future<void> Function(int index)? onDelete;
-  const BannerCarousel({super.key, required this.banners, this.isAdmin = false, this.onDelete});
+  const BannerCarousel(
+      {super.key, required this.banners, this.isAdmin = false, this.onDelete});
 
   @override
   State<BannerCarousel> createState() => _BannerCarouselState();
@@ -821,7 +823,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
       if (!mounted) return;
       final next = (_current + 1) % widget.banners.length;
       if (_controller.hasClients) {
-        _controller.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+        _controller.animateToPage(next,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut);
       }
     });
   }
@@ -844,8 +848,12 @@ class _BannerCarouselState extends State<BannerCarousel> {
           height: 200,
           child: GestureDetector(
             onPanDown: (_) => _timer?.cancel(),
-            onPanCancel: () { if (widget.banners.length>1) _startAutoplay(); },
-            onPanEnd: (_) { if (widget.banners.length>1) _startAutoplay(); },
+            onPanCancel: () {
+              if (widget.banners.length > 1) _startAutoplay();
+            },
+            onPanEnd: (_) {
+              if (widget.banners.length > 1) _startAutoplay();
+            },
             child: PageView.builder(
               controller: _controller,
               itemCount: banners.length,
@@ -855,24 +863,30 @@ class _BannerCarouselState extends State<BannerCarousel> {
                 final data = banner.data() as Map<String, dynamic>;
                 final image = data['imageData'] ?? '';
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        if ((data['images'] is List) || (data['imageUrls'] is List))
+                        if ((data['images'] is List) ||
+                            (data['imageUrls'] is List))
                           MarketplaceImageCarousel(
                             images: (data['images'] is List)
-                                ? List<String>.from((data['images'] as List).map((e) => e?.toString() ?? ''))
-                                : List<String>.from((data['imageUrls'] as List).map((e) => e?.toString() ?? '')),
+                                ? List<String>.from((data['images'] as List)
+                                    .map((e) => e?.toString() ?? ''))
+                                : List<String>.from((data['imageUrls'] as List)
+                                    .map((e) => e?.toString() ?? '')),
                             height: 200,
                             fit: BoxFit.cover,
                           )
                         else if (image.toString().startsWith('http'))
-                          CachedNetworkImage(imageUrl: image.toString(), fit: BoxFit.cover)
+                          CachedNetworkImage(
+                              imageUrl: image.toString(), fit: BoxFit.cover)
                         else if ((image ?? '').toString().isNotEmpty)
-                          Image.memory(base64Decode(image.toString()), fit: BoxFit.cover)
+                          Image.memory(base64Decode(image.toString()),
+                              fit: BoxFit.cover)
                         else
                           Container(color: Colors.grey[200]),
 
@@ -881,18 +895,23 @@ class _BannerCarouselState extends State<BannerCarousel> {
                             top: 12,
                             right: 12,
                             child: Container(
-                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
+                              decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(12)),
                               child: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.white),
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.white),
                                 onPressed: () async {
-                                  if (widget.onDelete != null) await widget.onDelete!(_current);
+                                  if (widget.onDelete != null)
+                                    await widget.onDelete!(_current);
                                 },
                               ),
                             ),
                           ),
 
                         // Text overlay (title + description) - ensure captions show on banners
-                        if ((data['title'] ?? '').toString().isNotEmpty || (data['description'] ?? '').toString().isNotEmpty)
+                        if ((data['title'] ?? '').toString().isNotEmpty ||
+                            (data['description'] ?? '').toString().isNotEmpty)
                           Positioned(
                             bottom: 0,
                             left: 0,
@@ -903,19 +922,37 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.6)
+                                  ],
                                 ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if ((data['title'] ?? '').toString().isNotEmpty)
-                                    Text((data['title'] ?? '').toString(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                                  if ((data['description'] ?? '').toString().isNotEmpty)
+                                  if ((data['title'] ?? '')
+                                      .toString()
+                                      .isNotEmpty)
+                                    Text((data['title'] ?? '').toString(),
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold)),
+                                  if ((data['description'] ?? '')
+                                      .toString()
+                                      .isNotEmpty)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 6),
-                                      child: Text((data['description'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                      child: Text(
+                                          (data['description'] ?? '')
+                                              .toString(),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13)),
                                     ),
                                 ],
                               ),
@@ -972,7 +1009,10 @@ class _MarketplaceImageCarouselState extends State<MarketplaceImageCarousel> {
     _autoplayTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       if (_isPaused) return;
       final next = (_current + 1) % widget.images.length;
-      if (mounted) _controller.animateToPage(next, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+      if (mounted)
+        _controller.animateToPage(next,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut);
     });
   }
 
@@ -984,15 +1024,31 @@ class _MarketplaceImageCarouselState extends State<MarketplaceImageCarousel> {
   }
 
   Widget _buildImage(String image) {
-    if (image.isEmpty) return Container(color: Colors.grey[200], height: widget.height, width: widget.width);
+    if (image.isEmpty)
+      return Container(
+          color: Colors.grey[200], height: widget.height, width: widget.width);
     if (image.startsWith('http')) {
-      return CachedNetworkImage(imageUrl: image, height: widget.height, width: widget.width, fit: widget.fit, placeholder: (c,s)=>Container(color: Colors.grey[200], height: widget.height, width: widget.width), errorWidget: (c,s,e)=>Container(color: Colors.grey[200], height: widget.height, width: widget.width));
+      return CachedNetworkImage(
+          imageUrl: image,
+          height: widget.height,
+          width: widget.width,
+          fit: widget.fit,
+          placeholder: (c, s) => Container(
+              color: Colors.grey[200],
+              height: widget.height,
+              width: widget.width),
+          errorWidget: (c, s, e) => Container(
+              color: Colors.grey[200],
+              height: widget.height,
+              width: widget.width));
     }
     try {
       final bytes = base64Decode(image);
-      return Image.memory(bytes, height: widget.height, width: widget.width, fit: widget.fit);
+      return Image.memory(bytes,
+          height: widget.height, width: widget.width, fit: widget.fit);
     } catch (_) {
-      return Container(color: Colors.grey[200], height: widget.height, width: widget.width);
+      return Container(
+          color: Colors.grey[200], height: widget.height, width: widget.width);
     }
   }
 
@@ -1186,17 +1242,25 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                   children: [
                     Hero(
                       tag: 'item_${widget.itemId}',
-                        child: ClipRRect(
+                      child: ClipRRect(
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(16),
                           topRight: Radius.circular(16),
                         ),
                         child: MarketplaceImageCarousel(
                           images: (widget.data['images'] is List)
-                              ? List<String>.from((widget.data['images'] as List).map((e) => e?.toString() ?? ''))
+                              ? List<String>.from(
+                                  (widget.data['images'] as List)
+                                      .map((e) => e?.toString() ?? ''))
                               : (widget.data['imageUrls'] is List)
-                                  ? List<String>.from((widget.data['imageUrls'] as List).map((e) => e?.toString() ?? ''))
-                                  : [widget.data['imageUrl'] ?? widget.data['imageData'] ?? ''],
+                                  ? List<String>.from(
+                                      (widget.data['imageUrls'] as List)
+                                          .map((e) => e?.toString() ?? ''))
+                                  : [
+                                      widget.data['imageUrl'] ??
+                                          widget.data['imageData'] ??
+                                          ''
+                                    ],
                           height: 140,
                           width: double.infinity,
                           fit: BoxFit.cover,
@@ -1390,10 +1454,17 @@ class MyAdsView extends StatelessWidget {
                         ),
                         child: MarketplaceImageCarousel(
                           images: (data['images'] is List)
-                              ? List<String>.from((data['images'] as List).map((e) => e?.toString() ?? ''))
+                              ? List<String>.from((data['images'] as List)
+                                  .map((e) => e?.toString() ?? ''))
                               : (data['imageUrls'] is List)
-                                  ? List<String>.from((data['imageUrls'] as List).map((e) => e?.toString() ?? ''))
-                                  : [data['imageUrl'] ?? data['imageData'] ?? ''],
+                                  ? List<String>.from(
+                                      (data['imageUrls'] as List)
+                                          .map((e) => e?.toString() ?? ''))
+                                  : [
+                                      data['imageUrl'] ??
+                                          data['imageData'] ??
+                                          ''
+                                    ],
                           width: 120,
                           height: 120,
                           fit: BoxFit.cover,
@@ -1858,10 +1929,16 @@ class ItemDetailView extends StatelessWidget {
                 tag: 'item_$itemId',
                 child: MarketplaceImageCarousel(
                   images: (itemData['images'] is List)
-                      ? List<String>.from((itemData['images'] as List).map((e) => e?.toString() ?? ''))
+                      ? List<String>.from((itemData['images'] as List)
+                          .map((e) => e?.toString() ?? ''))
                       : (itemData['imageUrls'] is List)
-                          ? List<String>.from((itemData['imageUrls'] as List).map((e) => e?.toString() ?? ''))
-                          : [itemData['imageUrl'] ?? itemData['imageData'] ?? ''],
+                          ? List<String>.from((itemData['imageUrls'] as List)
+                              .map((e) => e?.toString() ?? ''))
+                          : [
+                              itemData['imageUrl'] ??
+                                  itemData['imageData'] ??
+                                  ''
+                            ],
                   height: 350,
                   fit: BoxFit.cover,
                 ),
@@ -1997,16 +2074,41 @@ class ItemDetailView extends StatelessWidget {
                 ],
               ),
               child: BlueButton(
-                onPressed: () {
-                  final phone = itemData['phone'] ?? '';
+                onPressed: () async {
+                  final phone = (itemData['phone'] ?? '').toString().trim();
                   if (phone.isEmpty) {
                     MySnackBar().mySnackBar(
                       header: 'Error',
                       content: 'Phone number not available',
                       bgColor: Colors.red.shade100,
                     );
-                  } else {
-                    launchUrl(Uri.parse('https://wa.me/$phone'));
+                    return;
+                  }
+
+                  final waNumber = sanitizePhoneForWhatsApp(phone);
+                  if (waNumber.isEmpty) {
+                    MySnackBar().mySnackBar(
+                      header: 'Error',
+                      content: 'Invalid phone number',
+                      bgColor: Colors.red.shade100,
+                    );
+                    return;
+                  }
+
+                  final waUri = Uri.parse('https://wa.me/$waNumber');
+                  try {
+                    await launchUrl(waUri);
+                  } catch (e) {
+                    final telUri = Uri.parse('tel:+$waNumber');
+                    try {
+                      await launchUrl(telUri);
+                    } catch (e2) {
+                      MySnackBar().mySnackBar(
+                        header: 'Error',
+                        content: 'Could not open contact method',
+                        bgColor: Colors.red.shade100,
+                      );
+                    }
                   }
                 },
                 text: 'Contact Seller via WhatsApp',

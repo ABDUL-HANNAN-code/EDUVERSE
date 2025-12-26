@@ -61,6 +61,21 @@ class _AdminDashboardState extends State<AdminDashboard>
     _loadAdminProfile();
   }
 
+  // Wrap Firestore snapshots with error handling to avoid web SDK assertion
+  // bubbling up and crashing the app. Errors are logged and swallowed so UI
+  // can display a friendly message instead of causing unhandled exceptions.
+  Stream<QuerySnapshot> _safeCollectionStream(CollectionReference col) {
+    try {
+      return col.snapshots().handleError((e, st) {
+        // Log for diagnostics; do not rethrow to avoid breaking StreamBuilder
+        debugPrint('Firestore stream error: $e');
+      }, test: (_) => true);
+    } catch (e) {
+      debugPrint('Failed to obtain snapshots stream: $e');
+      return const Stream.empty();
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -231,8 +246,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                 colors: isSuperAdmin
                     ? [Colors.purple, Colors.deepPurple]
                     : (isUniversityAdmin
-                          ? [Colors.indigo, Colors.blue]
-                          : [Colors.teal, Colors.cyan]),
+                        ? [Colors.indigo, Colors.blue]
+                        : [Colors.teal, Colors.cyan]),
               ),
             ),
             child: Padding(
@@ -264,8 +279,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                     isSuperAdmin
                         ? 'Super Admin'
                         : (isUniversityAdmin
-                              ? 'University Admin'
-                              : 'Department Admin'),
+                            ? 'University Admin'
+                            : 'Department Admin'),
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                   ),
                 ],
@@ -1152,8 +1167,8 @@ class _AdminDashboardState extends State<AdminDashboard>
               'teacher': teacherCtrl.text.trim(),
               'isLab': isLab,
               'colorValue': Colors
-                  .primaries[(subjectCtrl.text.length) %
-                      Colors.primaries.length]
+                  .primaries[
+                      (subjectCtrl.text.length) % Colors.primaries.length]
                   .value,
               'createdAt': FieldValue.serverTimestamp(),
             },
@@ -1382,14 +1397,14 @@ class _AdminDashboardState extends State<AdminDashboard>
               .collection('timetables')
               .doc(data['docId'])
               .update({
-                'day': day,
-                'start': startTime,
-                'end': endTime,
-                'subject': subjectCtrl.text.trim(),
-                'location': roomCtrl.text.trim(),
-                'teacher': teacherCtrl.text.trim(),
-                'isLab': isLab,
-              });
+            'day': day,
+            'start': startTime,
+            'end': endTime,
+            'subject': subjectCtrl.text.trim(),
+            'location': roomCtrl.text.trim(),
+            'teacher': teacherCtrl.text.trim(),
+            'isLab': isLab,
+          });
 
           Get.back();
           Get.snackbar(
@@ -1546,8 +1561,8 @@ class _AdminDashboardState extends State<AdminDashboard>
               'teacher': teacherCtrl.text.trim(),
               'isLab': isLab,
               'colorValue': Colors
-                  .primaries[(subjectCtrl.text.length) %
-                      Colors.primaries.length]
+                  .primaries[
+                      (subjectCtrl.text.length) % Colors.primaries.length]
                   .value,
               'createdAt': FieldValue.serverTimestamp(),
             },
@@ -1583,8 +1598,28 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _db.collection('users').snapshots(),
+            stream: _safeCollectionStream(_db.collection('users')),
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error, color: Colors.red, size: 48),
+                      const SizedBox(height: 8),
+                      Text('Failed to load users: ${snapshot.error}'),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          setState(() {});
+                        },
+                        child: const Text('Retry'),
+                      )
+                    ],
+                  ),
+                );
+              }
+
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -1713,12 +1748,11 @@ class _AdminDashboardState extends State<AdminDashboard>
               DropdownButton<String>(
                 value: newRole,
                 isExpanded: true,
-                items:
-                    (isSuperAdmin
-                            ? ['student', 'admin', 'super_admin']
-                            : ['student', 'admin'])
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
+                items: (isSuperAdmin
+                        ? ['student', 'admin', 'super_admin']
+                        : ['student', 'admin'])
+                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                    .toList(),
                 onChanged: (v) => setState(() => newRole = v!),
               ),
               if (newRole == 'admin') ...[
