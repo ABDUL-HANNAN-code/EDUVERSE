@@ -301,13 +301,37 @@ class _LoginViewState extends State<LoginView> {
                 onPressed: () async {
                   try {
                     User? user = await AuthService()
-                        .logIn(email: _email.text, password: _password.text);
+                        .logIn(email: _email.text.trim(), password: _password.text);
                     if (user != null) {
-                      if (user.emailVerified) {
-                        Get.offAllNamed('/dashboard'); // Go to Module
-                      } else {
+                      // If email not verified, send to verify view
+                      if (!user.emailVerified) {
                         Get.to(() => const VerifyEmailView());
+                        return;
                       }
+
+                      // Fetch role from Firestore and route accordingly
+                      try {
+                        final doc = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .get();
+                        if (doc.exists) {
+                          final role = (doc.data()?['role'] ?? '').toString();
+                          if (role == 'recruiter') {
+                            Get.offAllNamed('/recruiter-dashboard');
+                            return;
+                          }
+                          if (role == 'admin') {
+                            Get.offAllNamed('/admin');
+                            return;
+                          }
+                        }
+                      } catch (e) {
+                        // ignore firestore lookup errors and fall back to dashboard
+                      }
+
+                      // Default route for regular users
+                      Get.offAllNamed('/dashboard');
                     }
                   } catch (e) {
                     // Handled in service

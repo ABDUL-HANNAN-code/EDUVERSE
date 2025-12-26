@@ -1,189 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // TESTING ONLY: allow any authenticated user full read/write access.
+    // This is insecure and must be tightened before production.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TESTING ONLY: allow any authenticated user full read/write access.
+    // This is insecure and must be tightened before production.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // TESTING ONLY: allow any authenticated user full read/write access.
+    // This is insecure and must be tightened before production.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
 
-    // ==========================================================
-    // 1. ROBUST HELPER FUNCTIONS
-    // ==========================================================
-
-    // Fetch the raw data of the user document
-    function getUserData(uid) {
-      return get(/databases/$(database)/documents/users/$(uid)).data;
+    // TESTING ONLY: Allow authenticated users whose `users/{uid}.role == 'recruiter'`
+    // full read/write access to all documents. This is permissive and unsafe for
+    // production; use only for local/dev testing.
+    match /{document=**} {
+      allow read, write: if request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'recruiter';
     }
 
-    // Check if the user is a Super Admin
-    function isSuperAdmin(uid) {
-      let data = getUserData(uid);
-      return data.role == 'super_admin';
-    }
-
-    // Smart function to get a user's University ID
-    // Handles BOTH Students (root field) and Admins (nested in adminScope)
-    function getSmartUniId(uid) {
-      let data = getUserData(uid);
-      // If 'uniId' exists at root, use it. Otherwise, look inside 'adminScope'.
-      return ("uniId" in data && data.uniId != null) 
-             ? data.uniId 
-             : data.adminScope.uniId;
-    }
-
-    // Check if the user is an Admin for the target University ID
-    function isUniAdmin(uid, targetUniId) {
-      let data = getUserData(uid);
-      // Check role AND compare the nested adminScope.uniId
-      return data.role == 'admin' 
-             && data.adminScope.uniId == targetUniId;
-    }
-
-    // Check if user is a Dept Admin
-    function isDeptAdmin(uid, targetUniId, targetDeptId) {
-      let data = getUserData(uid);
-      return data.role == 'admin'
-             && data.adminScope.uniId == targetUniId
-             && (data.adminScope.deptId == null || data.adminScope.deptId == targetDeptId);
-    }
-
-    // ==========================================================
-    // 2. USERS COLLECTION (Fix for "Manage Users")
-    // ==========================================================
-    match /users/{userId} {
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // READ RULES (Get & List)
-      allow read: if request.auth != null && (
-        // 1. User reading their own profile
-        request.auth.uid == userId || 
-        
-        // 2. Super Admin reading any profile
-        isSuperAdmin(request.auth.uid) ||
-        
-        // 3. University Admin reading profiles belonging to their Uni
-        (
-          getUserData(request.auth.uid).role == 'admin' &&
-          // Compare Admin's Scope ID vs Target User's Uni ID
-          getUserData(request.auth.uid).adminScope.uniId == resource.data.uniId
-        )
-      );
-
-      // WRITE RULES
-      allow update: if request.auth != null && (
-        // User updating themselves
-        request.auth.uid == userId ||
-        // Super Admin
-        isSuperAdmin(request.auth.uid) ||
-        // Uni Admin updating a user in their uni (e.g. changing roles)
-        (
-          getUserData(request.auth.uid).role == 'admin' &&
-          getUserData(request.auth.uid).adminScope.uniId == resource.data.uniId
-        )
-      );
-      
-      allow delete: if request.auth != null && (
-        request.auth.uid == userId ||
-        isSuperAdmin(request.auth.uid)
-      );
-
-      match /{subCollection=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-
-    // ==========================================================
-    // 3. COMPLAINTS (Fix for Anonymous Submission)
-    // ==========================================================
-    match /complaints/{complaintId} {
-      allow create: if request.auth != null
-        // 1. Check ID: Must be own UID OR 'ANONYMOUS_USER'
-        && (
-             request.resource.data.studentId == request.auth.uid || 
-             request.resource.data.studentId == 'ANONYMOUS_USER'
-           )
-        // 2. Check Uni: Must match the poster's actual Uni
-        && request.resource.data.uniId == getSmartUniId(request.auth.uid);
-
-      allow read: if request.auth != null && (
-        resource.data.studentId == request.auth.uid ||
-        isSuperAdmin(request.auth.uid) ||
-        isUniAdmin(request.auth.uid, resource.data.uniId)
-      );
-
-      allow update: if request.auth != null && (
-        isSuperAdmin(request.auth.uid) ||
-        isUniAdmin(request.auth.uid, resource.data.uniId)
-      );
-
-      allow delete: if request.auth != null && (
-        resource.data.studentId == request.auth.uid ||
-        isSuperAdmin(request.auth.uid)
-      );
-    }
-
-    // ==========================================================
-    // 4. UNIVERSITIES & SUBCOLLECTIONS
-    // ==========================================================
-    match /universities/{uni} {
-      allow read: if true;
-      allow write: if request.auth != null && (isSuperAdmin(request.auth.uid) || isUniAdmin(request.auth.uid, uni));
-
-      // University-level Complaints (Mirrored)
-      match /complaints/{complaintId} {
-        allow create: if request.auth != null
-          && (
-               request.resource.data.studentId == request.auth.uid || 
-               request.resource.data.studentId == 'ANONYMOUS_USER'
-             )
-          && request.resource.data.uniId == uni;
-
-        allow read: if request.auth != null && (
-          resource.data.studentId == request.auth.uid ||
-          isUniAdmin(request.auth.uid, uni) ||
-          isSuperAdmin(request.auth.uid)
-        );
-
-        allow update: if request.auth != null && (
-          isUniAdmin(request.auth.uid, uni) ||
-          isSuperAdmin(request.auth.uid)
-        );
-
-        allow delete: if request.auth != null && (
-          resource.data.studentId == request.auth.uid ||
-          isSuperAdmin(request.auth.uid)
-        );
-      }
-
-      // Timetables
-      match /timetables/{tt} {
-        allow read: if true;
-        allow write: if request.auth != null && (
-          isSuperAdmin(request.auth.uid) ||
-          isDeptAdmin(request.auth.uid, uni, request.resource.data.departmentId)
-        );
-      }
-
-      // Marketplace Items
-      match /marketplace_items/{itemId} {
-        allow read: if true;
-        allow create: if request.auth != null && (
-          isSuperAdmin(request.auth.uid) ||
-          isUniAdmin(request.auth.uid, uni) ||
-          (
-            getSmartUniId(request.auth.uid) == uni &&
-            request.resource.data.uid == request.auth.uid
-          )
-        );
-        allow update, delete: if request.auth != null && (
-          request.auth.uid == resource.data.uid ||
-          isUniAdmin(request.auth.uid, uni) ||
-          isSuperAdmin(request.auth.uid)
-        );
-      }
-
-      // AI Planner
-      match /ai_planner/{userDoc} {
-        allow read, write: if request.auth != null && (
-          request.auth.uid == userDoc ||
-          isUniAdmin(request.auth.uid, uni) ||
-          isSuperAdmin(request.auth.uid)
+  }
+}
         );
         match /{subCollection=**} {
           allow read, write: if request.auth != null && (
@@ -226,75 +84,11 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.recruiterId ||
         exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
         // university admin for job's target university
-        (request.resource.data.targetUniversity != null &&
-         exists(/databases/$(database)/documents/universities/$(request.resource.data.targetUniversity)/admins/$(request.auth.uid)))
-      );
-
-      // Update: recruiter owner or super-admin can update any fields.
-      // Additionally allow authenticated users to ONLY increment applicantsCount by 1.
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.recruiterId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        (
-          // only applicantsCount key changed and it's increment by exactly 1
-          request.resource.data.keys().hasOnly(['applicantsCount']) &&
-          request.resource.data.applicantsCount == resource.data.applicantsCount + 1
-        )
-      );
-
-      // Delete: only recruiter owner or super-admin
-      allow delete: if request.auth != null && (
-        request.auth.uid == resource.data.recruiterId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-      );
-    }
-
-    // Applications stored at root
-    match /applications/{appId} {
-      // Create: authenticated students may create their own application for an existing job
-      allow create: if request.auth != null &&
-        request.resource.data.studentId == request.auth.uid &&
-        request.resource.data.jobId is string &&
-        exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
-        // status must start as 'pending'
-        request.resource.data.status == 'pending';
-
-      // Read: student owner, recruiter owning the job, or super-admin
-      allow read: if request.auth != null && (
-        resource.data.studentId == request.auth.uid ||
-        (
-          resource.data.jobId is string &&
-          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
-          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
-        ) ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-      );
-
-      // Update: recruiter owning the job or super-admin can update status/fields
-      allow update: if request.auth != null && (
-        (
-          resource.data.jobId is string &&
-          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
-          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
-        ) ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-      );
-
-      // Delete: owner (student), recruiter for job, or super-admin
-      allow delete: if request.auth != null && (
-        request.auth.uid == resource.data.studentId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        (
-          resource.data.jobId is string &&
-          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
-          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
-        )
-      );
-    }
-
-    // Default: deny everything else
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
+        rules_version = '2';
+        service cloud.firestore {
+          match /databases/{database}/documents {
+            // TESTING ONLY: allow any authenticated user full read/write access.
+            // This is insecure and must be tightened before production.
+            allow read, write: if request.auth != null;
+          }
+        }

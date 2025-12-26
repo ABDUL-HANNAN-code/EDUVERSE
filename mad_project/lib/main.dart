@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -22,9 +23,7 @@ import 'ai_study_planner/ai_study_planner.dart';
 // Placement module (student & recruiter)
 import 'timetable/PLACEMENTS/student_placement_screen.dart';
 import 'timetable/PLACEMENTS/recruiter_admin_panel.dart';
-import 'recruiter_auth.dart';
-// Welcome screen
-import 'timetable/welcome.dart';
+// Recruiter admin auth removed - use `auth.dart`'s `LoginView`
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +53,17 @@ void main() async {
         const Settings(persistenceEnabled: false);
   } catch (e) {
     // ignore errors applying settings in non-web platforms
+  }
+
+  // Print recruiter admin credentials (from environment or defaults)
+  try {
+    final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
+    final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
+    debugPrint('RECRUITER_ADMIN_CREDENTIALS:');
+    debugPrint('  email: $recruiterEmail');
+    debugPrint('  password: $recruiterPassword');
+  } catch (_) {
+    // Platform.environment may not be available on all targets; ignore.
   }
   // Global error handling: show exceptions in UI instead of white screen
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -136,16 +146,14 @@ class UniversityApp extends StatelessWidget {
           title: 'Eduverse',
           theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Poppins'),
 
-          // Start with the new Welcome Role Selection screen
+          // Authentication gate decides start screen
           home: const AuthGate(),
           initialRoute: null, // Let AuthGate decide
 
           // Define Names for modules for easy navigation
           getPages: [
-            // Welcome & Auth Routes
-            GetPage(name: '/welcome', page: () => const WelcomeRoleScreen()),
+            // Auth Routes
             GetPage(name: '/login', page: () => const LoginView()),
-            GetPage(name: '/recruiter-login', page: () => const RecruiterAuthScreen()),
             
             // Main Dashboard Routes
             GetPage(
@@ -200,7 +208,7 @@ class AuthGate extends StatelessWidget {
           : const VerifyEmailView(); // Not verified -> Verify email
     }
     
-    // No user logged in -> Show Welcome Screen (Role Selection)
-    return const WelcomeRoleScreen();
+    // No user logged in -> Show classic Login screen
+    return const LoginView();
   }
 }

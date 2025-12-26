@@ -5,6 +5,8 @@ import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
+import 'recruiter_requests_admin.dart';
+import 'admin_notifications.dart';
 import '../lost_and_found_admin.dart';
 // Poster manager removed from admin dashboard per UX request
 
@@ -487,6 +489,27 @@ class _AdminDashboardState extends State<AdminDashboard>
             ),
           ),
           // Manage Marketplaces - removed from drawer; accessible via Dashboard tab
+          // Recruiter Requests (visible to admins)
+          if (isSuperAdmin || isUniversityAdmin) ...[
+            ListTile(
+              leading: const Icon(Icons.notifications),
+              title: const Text('Notifications'),
+              subtitle: const Text('View admin notifications'),
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AdminNotifications(adminUniId: isUniversityAdmin ? selectedUni : null)));
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.work_outline),
+              title: const Text('Recruiter Requests'),
+              subtitle: const Text('Approve or review recruiter job requests'),
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => RecruiterRequestsAdmin(adminUniId: isUniversityAdmin ? selectedUni : null)));
+              },
+            ),
+          ],
         ],
       ),
     );

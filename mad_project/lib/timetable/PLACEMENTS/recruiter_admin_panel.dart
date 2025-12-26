@@ -2,7 +2,9 @@
 // Complete Recruiter Admin Panel with Firebase Authentication & Firestore
 
 import 'package:flutter/material.dart';
+import '../../auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 // ==================== MODELS ====================
@@ -13,6 +15,7 @@ class RecruiterUser {
   final String companyName;
   final String role; // 'recruiter'
   final String? photoUrl;
+  final bool isApproved;
 
   RecruiterUser({
     required this.uid,
@@ -20,6 +23,7 @@ class RecruiterUser {
     required this.companyName,
     required this.role,
     this.photoUrl,
+    this.isApproved = false,
   });
 
   factory RecruiterUser.fromFirestore(DocumentSnapshot doc) {
@@ -30,6 +34,7 @@ class RecruiterUser {
       companyName: data['companyName'] ?? '',
       role: data['role'] ?? 'recruiter',
       photoUrl: data['photoUrl'],
+      isApproved: data['isApproved'] ?? false,
     );
   }
 
@@ -182,7 +187,8 @@ class RecruiterAuthService {
         'companyName': companyName,
         'role': 'recruiter',
         'createdAt': FieldValue.serverTimestamp(),
-        'isApproved': false, // Needs admin approval
+        // Auto-approve recruiters for single-admin setups
+        'isApproved': true,
       });
 
       return {'success': true, 'user': result.user};
@@ -235,13 +241,50 @@ class RecruiterAuthService {
 class RecruiterFirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Post a Job
-  Future<Map<String, dynamic>> postJob(JobPosting job) async {
+  // Submit a Job Request (requires admin approvals)
+  Future<Map<String, dynamic>> submitJobRequest(JobPosting job) async {
     try {
-      await _firestore.collection('jobs').add(job.toMap());
-      return {'success': true, 'message': 'Job posted successfully!'};
+      // Build base request document
+      final reqRef = _firestore.collection('job_requests').doc();
+      final Map<String, dynamic> doc = {
+        'job': job.toMap(),
+        'recruiterId': job.recruiterId,
+        'recruiterEmail': job.recruiterEmail,
+        'companyName': job.company,
+        'targetUniversity': job.targetUniversity,
+        'status': 'pending',
+        'approvals': {},
+        'pendingFor': [],
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Determine which universities need to approve
+      if (job.targetUniversity == 'All Universities') {
+        // fetch all university ids
+        final unis = await _firestore.collection('universities').get();
+        final ids = unis.docs.map((d) => d.id).toList();
+        doc['pendingFor'] = ids;
+      } else {
+        // try to find university by name
+        final snap = await _firestore
+            .collection('universities')
+            .where('name', isEqualTo: job.targetUniversity)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          doc['pendingFor'] = [snap.docs.first.id];
+        } else {
+          // fallback: leave pendingFor empty so admins can review globally
+          doc['pendingFor'] = [];
+        }
+      }
+
+      await reqRef.set(doc);
+      return {'success': true, 'message': 'Request submitted — pending admin approvals.'};
+    } on FirebaseException catch (e) {
+      return {'success': false, 'message': 'Error submitting request: ${e.message}'};
     } catch (e) {
-      return {'success': false, 'message': 'Error posting job: ${e.toString()}'};
+      return {'success': false, 'message': 'Error submitting request: ${e.toString()}'};
     }
   }
 
@@ -305,297 +348,12 @@ class RecruiterFirestoreService {
 
 // ==================== LOGIN SCREEN ====================
 
-class RecruiterLoginScreen extends StatefulWidget {
+class RecruiterLoginScreen extends StatelessWidget {
   const RecruiterLoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<RecruiterLoginScreen> createState() => _RecruiterLoginScreenState();
-}
-
-class _RecruiterLoginScreenState extends State<RecruiterLoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _authService = RecruiterAuthService();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-  bool _isSignUp = false;
-  final _companyNameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _companyNameController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _handleAuth() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    Map<String, dynamic> result;
-
-    if (_isSignUp) {
-      result = await _authService.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        companyName: _companyNameController.text.trim(),
-      );
-    } else {
-      result = await _authService.signIn(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
-    }
-
-    setState(() => _isLoading = false);
-
-    if (result['success']) {
-      if (_isSignUp) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created! Awaiting admin approval.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const RecruiterAdminPanel(),
-          ),
-        );
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo/Icon
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.business_center,
-                      size: 60,
-                      color: Color(0xFF5E2686),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Title
-                  Text(
-                    _isSignUp ? 'Recruiter Registration' : 'Recruiter Portal',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isSignUp
-                        ? 'Create your recruiter account'
-                        : 'Sign in to manage job postings',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Login Form Card
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        children: [
-                          // Company Name (Sign Up only)
-                          if (_isSignUp) ...[
-                            TextFormField(
-                              controller: _companyNameController,
-                              decoration: InputDecoration(
-                                labelText: 'Company Name',
-                                prefixIcon: const Icon(Icons.business),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFFF5F5F7),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter company name';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-
-                          // Email
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              labelText: 'Email',
-                              prefixIcon: const Icon(Icons.email_outlined),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFF5F5F7),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Password
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFF5F5F7),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Submit Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _handleAuth,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF5E2686),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      _isSignUp ? 'Create Account' : 'Sign In',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Toggle Sign Up/Sign In
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _isSignUp = !_isSignUp;
-                              });
-                            },
-                            child: Text(
-                              _isSignUp
-                                  ? 'Already have an account? Sign In'
-                                  : 'New recruiter? Create Account',
-                              style: const TextStyle(
-                                color: Color(0xFF5E2686),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+    return const LoginView();
   }
 }
 
@@ -622,17 +380,35 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
 
   Future<void> _loadRecruiterData() async {
     final user = _authService.currentUser;
-    if (user != null) {
-      final data = await _authService.getRecruiterData(user.uid);
-      final applicants = await _firestoreService.getTotalApplicants(user.uid);
-      setState(() {
-        _recruiterData = data;
-        _totalApplicants = applicants;
-      });
-    }
+      if (user != null) {
+        final data = await _authService.getRecruiterData(user.uid);
+        final applicants = await _firestoreService.getTotalApplicants(user.uid);
+        setState(() {
+          _recruiterData = data;
+          _totalApplicants = applicants;
+        });
+      }
   }
 
   void _showPostJobSheet() {
+    // Prevent posting if recruiter not approved or data not loaded
+    if (_recruiterData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Recruiter data is still loading, try again.'),
+        backgroundColor: Colors.orange,
+      ));
+      return;
+    }
+    if (_recruiterData!.role != 'recruiter') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Access denied: not a recruiter account.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+    // For single-recruiter-admin setups, treat recruiters as approved
+    // and allow posting even if the Firestore flag is false.
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -649,7 +425,7 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
     await _authService.signOut();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (context) => const RecruiterLoginScreen(),
+        builder: (context) => const LoginView(),
       ),
     );
   }
@@ -659,7 +435,7 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
     final user = _authService.currentUser;
 
     if (user == null) {
-      return const RecruiterLoginScreen();
+      return const LoginView();
     }
 
     return Scaffold(
@@ -680,43 +456,46 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                 ),
               ),
               child: FlexibleSpaceBar(
-                title: const Text(
-                  'Recruiter Dashboard',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                background: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        if (_recruiterData != null) ...[
-                          Text(
-                            _recruiterData!.companyName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            user.email ?? '',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
+                titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Recruiter Dashboard',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
+                    if (_recruiterData != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _recruiterData!.companyName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        user.email ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                background: const SizedBox.shrink(),
               ),
             ),
             actions: [
@@ -760,6 +539,37 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                               const Color(0xFF2E7D32),
                             ),
                           ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Pending Requests (if any)
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('job_requests')
+                        .where('recruiterId', isEqualTo: user.uid)
+                        .where('status', isEqualTo: 'pending')
+                        .orderBy('createdAt', descending: true)
+                        .snapshots(),
+                    builder: (context, snap) {
+                      if (!snap.hasData || snap.data!.docs.isEmpty) return const SizedBox.shrink();
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          const Text('Pending Requests', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 8),
+                          ...snap.data!.docs.map((d) {
+                            final Map jd = (d.data() as Map<String,dynamic>)['job'] ?? {};
+                            return Card(
+                              child: ListTile(
+                                title: Text(jd['title'] ?? 'Untitled'),
+                                subtitle: Text('Target: ${d['targetUniversity'] ?? 'N/A'}'),
+                                trailing: const Text('Pending', style: TextStyle(color: Colors.orange)),
+                              ),
+                            );
+                          }).toList(),
                         ],
                       );
                     },
@@ -1279,26 +1089,43 @@ class _PostJobBottomSheetState extends State<PostJobBottomSheet> {
     Map<String, dynamic> result;
 
     if (widget.existingJob != null) {
-      // Update existing job
+      // Update existing job: create an update request (admin flow could be added later)
       result = await _firestoreService.updateJob(
         widget.existingJob!.id!,
         job.toMap(),
       );
     } else {
-      // Create new job
-      result = await _firestoreService.postJob(job);
+      // Create new job request (requires admin approval)
+      result = await _firestoreService.submitJobRequest(job);
     }
 
     setState(() => _isLoading = false);
 
     if (result['success']) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']),
-          backgroundColor: Colors.green,
+      // Show a friendly confirmation dialog for pending approval
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Request Submitted'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.hourglass_top, size: 48, color: Colors.deepPurple),
+              SizedBox(height: 12),
+              Text('Your job request was submitted and is pending admin approval.'),
+              SizedBox(height: 8),
+              Text('You will be notified when an admin approves it.', style: TextStyle(fontSize: 12)),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            )
+          ],
         ),
       );
+      Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
