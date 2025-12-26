@@ -43,9 +43,11 @@ class StudentComplaintView extends StatelessWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: controller.complaints.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final complaint = controller.complaints[index];
                   return _buildComplaintCard(complaint);
@@ -222,6 +224,31 @@ class StudentComplaintView extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         _buildStatusBadge(complaint.status),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          onSelected: (v) async {
+                            if (v == 'delete') {
+                              final confirm = await Get.defaultDialog<bool>(
+                                title: 'Confirm Delete',
+                                middleText: 'Delete this complaint?',
+                                textConfirm: 'Delete',
+                                textCancel: 'Cancel',
+                                onConfirm: () => Get.back(result: true),
+                                onCancel: () => Get.back(result: false),
+                              );
+                              if (confirm == true) {
+                                await controller.deleteComplaint(complaint.id);
+                              }
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -248,7 +275,8 @@ class StudentComplaintView extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat('MMM dd, yyyy').format(complaint.createdAt),
+                          DateFormat('MMM dd, yyyy')
+                              .format(complaint.createdAt),
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[600],

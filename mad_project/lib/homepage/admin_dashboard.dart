@@ -8,6 +8,7 @@ import '../marketplace_admin_list.dart';
 import 'recruiter_requests_admin.dart';
 import 'admin_notifications.dart';
 import '../lost_and_found_admin.dart';
+import '../complaints/views/admin_complaint_list.dart';
 // Poster manager removed from admin dashboard per UX request
 
 class AdminDashboard extends StatefulWidget {
@@ -122,7 +123,9 @@ class _AdminDashboardState extends State<AdminDashboard>
       isLoadingProfile = false;
     });
 
-    final tabLength = 2 + ((isSuperAdmin || isUniversityAdmin) ? 2 : 0);
+    final tabLength = 2 +
+        ((isSuperAdmin || isUniversityAdmin || isDepartmentAdmin) ? 1 : 0) +
+        ((isSuperAdmin || isUniversityAdmin) ? 2 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
     // Ensure UI updates (FAB visibility) when the selected tab changes
     _tabController.addListener(() {
@@ -196,6 +199,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           tabs: [
             const Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
             const Tab(icon: Icon(Icons.people), text: "Manage Users"),
+            if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
+              const Tab(icon: Icon(Icons.report_problem), text: 'Complaints'),
             if (isSuperAdmin || isUniversityAdmin)
               const Tab(
                 icon: Icon(Icons.store_mall_directory),
@@ -215,6 +220,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         children: [
           _buildGridTimetable(),
           _buildUserManager(),
+          if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
+            AdminComplaintList(adminViewUniId: selectedUni),
           if (isSuperAdmin || isUniversityAdmin) const MarketplaceAdminList(),
           if (isSuperAdmin || isUniversityAdmin)
             LostAndFoundAdminList(adminViewUniId: selectedUni),

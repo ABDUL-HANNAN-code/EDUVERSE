@@ -73,6 +73,13 @@ class ComplaintModel {
   final DateTime createdAt;
   final String? adminReply;
   final DateTime? updatedAt;
+  final String? studentName;
+  final String? uniName;
+  final String? deptName;
+  final String? sectionId;
+  final String? sectionName;
+  final String? semester;
+  final String? shift;
 
   ComplaintModel({
     required this.id,
@@ -88,6 +95,13 @@ class ComplaintModel {
     required this.createdAt,
     this.adminReply,
     this.updatedAt,
+    this.studentName,
+    this.uniName,
+    this.deptName,
+    this.sectionId,
+    this.sectionName,
+    this.semester,
+    this.shift,
   });
 
   factory ComplaintModel.fromFirestore(DocumentSnapshot doc) {
@@ -117,6 +131,13 @@ class ComplaintModel {
       updatedAt: data['updatedAt'] != null
           ? (data['updatedAt'] as Timestamp).toDate()
           : null,
+      studentName: data['studentName'] ?? data['studentDisplayName'] ?? null,
+      uniName: data['uniName'] ?? null,
+      deptName: data['deptName'] ?? null,
+      sectionId: data['sectionId'] ?? null,
+      sectionName: data['sectionName'] ?? null,
+      semester: data['semester'] ?? null,
+      shift: data['shift'] ?? null,
     );
   }
 
@@ -134,6 +155,13 @@ class ComplaintModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'adminReply': adminReply,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
+      if (studentName != null) 'studentName': studentName,
+      if (uniName != null) 'uniName': uniName,
+      if (deptName != null) 'deptName': deptName,
+      if (sectionId != null) 'sectionId': sectionId,
+      if (sectionName != null) 'sectionName': sectionName,
+      if (semester != null) 'semester': semester,
+      if (shift != null) 'shift': shift,
     };
   }
 
@@ -151,6 +179,13 @@ class ComplaintModel {
     DateTime? createdAt,
     String? adminReply,
     DateTime? updatedAt,
+    String? studentName,
+    String? uniName,
+    String? deptName,
+    String? sectionId,
+    String? sectionName,
+    String? semester,
+    String? shift,
   }) {
     return ComplaintModel(
       id: id ?? this.id,
@@ -166,6 +201,13 @@ class ComplaintModel {
       createdAt: createdAt ?? this.createdAt,
       adminReply: adminReply ?? this.adminReply,
       updatedAt: updatedAt ?? this.updatedAt,
+      studentName: studentName ?? this.studentName,
+      uniName: uniName ?? this.uniName,
+      deptName: deptName ?? this.deptName,
+      sectionId: sectionId ?? this.sectionId,
+      sectionName: sectionName ?? this.sectionName,
+      semester: semester ?? this.semester,
+      shift: shift ?? this.shift,
     );
   }
 }

@@ -21,7 +21,7 @@ class AdminComplaintController extends GetxController {
   final selectedStatus = Rx<ComplaintStatus?>(null);
   final selectedUniId = ''.obs;
   final isSuperAdmin = false.obs;
-  final studentNames = <String, String>{}.obs;
+  final studentProfiles = <String, Map<String, String>>{}.obs;
   final uniNames = <String, String>{}.obs;
   final universities = <Map<String, String>>[].obs; // list of {id,name}
   StreamSubscription<List<ComplaintModel>>? _complaintSub;
@@ -196,26 +196,51 @@ class AdminComplaintController extends GetxController {
     }
 
     try {
-      // Fetch missing student names
-      final missingStudents = studentIds.where((id) => !studentNames.containsKey(id)).toList();
+      // Fetch missing student profiles (name, dept, section, semester, shift)
+      final missingStudents =
+          studentIds.where((id) => !studentProfiles.containsKey(id)).toList();
       if (missingStudents.isNotEmpty) {
         final futures = missingStudents.map((id) async {
           try {
-            final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+            final doc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(id)
+                .get();
             final data = doc.data() ?? {};
             final name = (data['name'] ?? data['displayName'] ?? '') as String;
-            if (name.isNotEmpty) studentNames[id] = name;
+            final deptId = (data['departmentId'] ?? '') as String;
+            final deptName =
+                (data['departmentName'] ?? data['department'] ?? '') as String;
+            final sectionId = (data['sectionId'] ?? '') as String;
+            final sectionName =
+                (data['sectionName'] ?? data['section'] ?? '') as String;
+            final semester = (data['semester']?.toString() ?? '') as String;
+            final shift = (data['shift'] ?? '') as String;
+
+            studentProfiles[id] = {
+              'name': name,
+              'deptId': deptId,
+              'deptName': deptName,
+              'sectionId': sectionId,
+              'sectionName': sectionName,
+              'semester': semester,
+              'shift': shift,
+            };
           } catch (_) {}
         });
         await Future.wait(futures);
       }
 
       // Fetch missing university names
-      final missingUnis = uniIds.where((id) => !uniNames.containsKey(id)).toList();
+      final missingUnis =
+          uniIds.where((id) => !uniNames.containsKey(id)).toList();
       if (missingUnis.isNotEmpty) {
         final futures = missingUnis.map((id) async {
           try {
-            final doc = await FirebaseFirestore.instance.collection('universities').doc(id).get();
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(id)
+                .get();
             final data = doc.data() ?? {};
             final name = (data['name'] ?? '') as String;
             if (name.isNotEmpty) uniNames[id] = name;
@@ -223,6 +248,62 @@ class AdminComplaintController extends GetxController {
         });
         await Future.wait(futures);
       }
+      // Attempt to resolve department/section names from university subcollections
+      for (var id in studentProfiles.keys) {
+        final prof = studentProfiles[id]!;
+        final deptId = prof['deptId'] ?? '';
+        final sectionId = prof['sectionId'] ?? '';
+        final uniIdForStudent = (list.firstWhere((c) => c.studentId == id,
+            orElse: () => ComplaintModel(
+                id: '',
+                title: '',
+                description: '',
+                category: ComplaintCategory.other,
+                urgency: ComplaintUrgency.low,
+                status: ComplaintStatus.pending,
+                isAnonymous: false,
+                studentId: '',
+                uniId: '',
+                deptId: '',
+                createdAt: DateTime.now()))).uniId;
+        if ((prof['deptName'] ?? '').isEmpty &&
+            deptId.isNotEmpty &&
+            uniIdForStudent.isNotEmpty) {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(uniIdForStudent)
+                .collection('departments')
+                .doc(deptId)
+                .get();
+            final data = doc.data() ?? {};
+            final resolved = (data['name'] ?? data['title'] ?? '') as String;
+            if (resolved.isNotEmpty) {
+              studentProfiles[id]!['deptName'] = resolved;
+            }
+          } catch (_) {}
+        }
+        if ((prof['sectionName'] ?? '').isEmpty &&
+            sectionId.isNotEmpty &&
+            uniIdForStudent.isNotEmpty) {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(uniIdForStudent)
+                .collection('sections')
+                .doc(sectionId)
+                .get();
+            final data = doc.data() ?? {};
+            final resolved = (data['name'] ?? data['title'] ?? '') as String;
+            if (resolved.isNotEmpty) {
+              studentProfiles[id]!['sectionName'] = resolved;
+            }
+          } catch (_) {}
+        }
+      }
+
+      print(
+          'AdminComplaintController: populated ${studentProfiles.length} student profiles and ${uniNames.length} uni names');
     } catch (e) {
       print('AdminComplaintController: error populating names: $e');
     }
@@ -285,6 +366,32 @@ class AdminComplaintController extends GetxController {
       Get.snackbar(
         'Error',
         'Failed to update complaint: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+    }
+  }
+
+  Future<void> deleteComplaint(String complaintId) async {
+    try {
+      isLoading.value = true;
+      await _service.deleteComplaint(complaintId);
+      isLoading.value = false;
+      Get.back();
+      Get.snackbar(
+        'Deleted',
+        'Complaint deleted successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.shade100,
+        colorText: Colors.green.shade900,
+      );
+      loadComplaints();
+    } catch (e) {
+      isLoading.value = false;
+      Get.snackbar(
+        'Error',
+        'Failed to delete complaint: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.shade100,
         colorText: Colors.red.shade900,
@@ -448,6 +555,37 @@ class AdminComplaintController extends GetxController {
                           ),
                   ),
                 )),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red.shade700,
+                  side: BorderSide(color: Colors.red.shade200),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  final confirm = await Get.defaultDialog<bool>(
+                    title: 'Confirm Delete',
+                    middleText:
+                        'Are you sure you want to delete this complaint?',
+                    textConfirm: 'Delete',
+                    textCancel: 'Cancel',
+                    onConfirm: () => Get.back(result: true),
+                    onCancel: () => Get.back(result: false),
+                  );
+                  if (confirm == true) {
+                    await deleteComplaint(complaint.id);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text('Delete Complaint',
+                      style: TextStyle(color: Colors.red.shade700)),
+                ),
+              ),
+            ),
           ],
         ),
       ),
