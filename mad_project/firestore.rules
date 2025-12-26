@@ -2,166 +2,218 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Public university metadata (used during signup)
-    match /universities/{uni} {
-      // Allow anyone to read university docs and subcollections (domains, allowed_ids, departments, sections)
-      allow read: if true;
+    // ==========================================================
+    // 1. ROBUST HELPER FUNCTIONS
+    // ==========================================================
 
-      // Only super-admins or this university's admins can write university docs
-      allow write: if request.auth != null &&
-        (exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-         || exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)));
-
-      // Timetables: allow writes by super-admins or by university/admins
-      // Dept-level admins are allowed to write timetables for their dept only.
-      match /timetables/{tt} {
-        allow read: if true;
-        allow write: if request.auth != null && (
-          // super-admins can always write
-          exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-          // university admin document can allow uni-wide or dept-scoped admin
-          (exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)) &&
-            (
-              // either the admin doc has no deptId (uni admin) OR matches the timetable's departmentId
-              get(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)).data.deptId == null ||
-              get(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)).data.deptId == request.resource.data.departmentId
-            )
-          )
-        );
-      }
-
-      // Marketplace items: allow students belonging to this university to create items.
-      // Admins and super-admins can create/update/delete. Owners can update/delete their own items.
-
-      match /marketplace_items/{itemId} {
-        allow read: if true;
-
-        // Create: only allow if authenticated and one of:
-        // - super-admin
-        // - university admin for this university
-        // - regular user whose users/{uid}.uniId matches this university AND
-        //   the posted document's `uid` equals the authenticated uid
-        allow create: if request.auth != null && (
-          // super-admin
-          exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-          // university admin
-          exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)) ||
-          // regular user must belong to this university and must not impersonate another uid
-          (
-            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniId == uni &&
-            request.resource.data.uid == request.auth.uid
-          )
-        );
-
-        // Update/delete: owner, university admin, or super-admin
-        allow update, delete: if request.auth != null && (
-          request.auth.uid == resource.data.uid ||
-          exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)) ||
-          exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-        );
-      }
-
-      // Other subcollections under universities follow the same permissions as before
-      // Special case: ai_planner collection holds per-user AI data (chat, tasks, study)
-      // Allow a user to read/write their own ai_planner doc and its subcollections
-      // if their `users/{uid}.uniId` matches this university. Admins and super-admins
-      // retain full access.
-      match /ai_planner/{userDoc} {
-        allow read: if request.auth != null && (
-          request.auth.uid == userDoc ||
-          exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)) ||
-          exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-        ) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniId == uni;
-
-        match /{subCollection=**} {
-          allow read, write: if request.auth != null && (
-            request.auth.uid == userDoc ||
-            exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)) ||
-            exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-          ) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniId == uni;
-        }
-      }
-
-      // Other subcollections under universities follow the same permissions as before
-      match /{subCollection=**} {
-        allow read: if true;
-        allow write: if request.auth != null &&
-          (exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
-           || exists(/databases/$(database)/documents/universities/$(uni)/admins/$(request.auth.uid)));
-      }
+    // Fetch the raw data of the user document
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
-    // Users: allow per-doc reads for owner, super-admins, and university admins (uni-admins limited to same uni)
+    // Check if the user is a Super Admin
+    function isSuperAdmin(uid) {
+      let data = getUserData(uid);
+      return data.role == 'super_admin';
+    }
+
+    // Smart function to get a user's University ID
+    // Handles BOTH Students (root field) and Admins (nested in adminScope)
+    function getSmartUniId(uid) {
+      let data = getUserData(uid);
+      // If 'uniId' exists at root, use it. Otherwise, look inside 'adminScope'.
+      return ("uniId" in data && data.uniId != null) 
+             ? data.uniId 
+             : data.adminScope.uniId;
+    }
+
+    // Check if the user is an Admin for the target University ID
+    function isUniAdmin(uid, targetUniId) {
+      let data = getUserData(uid);
+      // Check role AND compare the nested adminScope.uniId
+      return data.role == 'admin' 
+             && data.adminScope.uniId == targetUniId;
+    }
+
+    // Check if user is a Dept Admin
+    function isDeptAdmin(uid, targetUniId, targetDeptId) {
+      let data = getUserData(uid);
+      return data.role == 'admin'
+             && data.adminScope.uniId == targetUniId
+             && (data.adminScope.deptId == null || data.adminScope.deptId == targetDeptId);
+    }
+
+    // ==========================================================
+    // 2. USERS COLLECTION (Fix for "Manage Users")
+    // ==========================================================
     match /users/{userId} {
-      // allow a user to create their own doc
       allow create: if request.auth != null && request.auth.uid == userId;
 
-      // allow reading a single user doc if:
-      // - the owner, or
-      // - a super-admin, or
-      // - a university admin for the user's uni (checks the target doc's uniId)
-      allow get: if request.auth != null && (
-        request.auth.uid == userId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        (resource.data.uniId != null &&
-         exists(/databases/$(database)/documents/universities/$(resource.data.uniId)/admins/$(request.auth.uid)))
+      // READ RULES (Get & List)
+      allow read: if request.auth != null && (
+        // 1. User reading their own profile
+        request.auth.uid == userId || 
+        
+        // 2. Super Admin reading any profile
+        isSuperAdmin(request.auth.uid) ||
+        
+        // 3. University Admin reading profiles belonging to their Uni
+        (
+          getUserData(request.auth.uid).role == 'admin' &&
+          // Compare Admin's Scope ID vs Target User's Uni ID
+          getUserData(request.auth.uid).adminScope.uniId == resource.data.uniId
+        )
       );
 
-      // allow listing / querying / listing all users only for super-admins
-      allow list: if request.auth != null &&
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid));
-
-      // allow updates/deletes only by owner or super-admin
-      allow update, delete: if request.auth != null && (
+      // WRITE RULES
+      allow update: if request.auth != null && (
+        // User updating themselves
         request.auth.uid == userId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+        // Super Admin
+        isSuperAdmin(request.auth.uid) ||
+        // Uni Admin updating a user in their uni (e.g. changing roles)
+        (
+          getUserData(request.auth.uid).role == 'admin' &&
+          getUserData(request.auth.uid).adminScope.uniId == resource.data.uniId
+        )
+      );
+      
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId ||
+        isSuperAdmin(request.auth.uid)
       );
 
-      // Allow authenticated users to read/write their own subcollections
-      // such as chat_history and tasks. This keeps per-user data writable
-      // by the account owner while preserving the stricter rules above
-      // for the top-level user document.
       match /{subCollection=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
-    // Super-admin list: only existing super-admins can update
-    match /super_admins/{uid} {
-      allow read: if request.auth != null && exists(/databases/$(database)/documents/super_admins/$(request.auth.uid));
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/super_admins/$(request.auth.uid));
-    }
-
-    // Default: deny everything else
-    // Complaints stored at root for global queries, and mirrored under universities/{uni}/complaints
+    // ==========================================================
+    // 3. COMPLAINTS (Fix for Anonymous Submission)
+    // ==========================================================
     match /complaints/{complaintId} {
-      // Create: only authenticated users creating complaints for their own account
       allow create: if request.auth != null
-        // studentId must match caller
-        && request.resource.data.studentId == request.auth.uid
-        // uniId in the document must equal the user's uniId
-        && request.resource.data.uniId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uniId;
+        // 1. Check ID: Must be own UID OR 'ANONYMOUS_USER'
+        && (
+             request.resource.data.studentId == request.auth.uid || 
+             request.resource.data.studentId == 'ANONYMOUS_USER'
+           )
+        // 2. Check Uni: Must match the poster's actual Uni
+        && request.resource.data.uniId == getSmartUniId(request.auth.uid);
 
-      // Read: owner, university admins for the same uni, or super-admin
       allow read: if request.auth != null && (
         resource.data.studentId == request.auth.uid ||
-        // super-admin
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        // university admin for the complaint's uni
-        exists(/databases/$(database)/documents/universities/$(resource.data.uniId)/admins/$(request.auth.uid))
+        isSuperAdmin(request.auth.uid) ||
+        isUniAdmin(request.auth.uid, resource.data.uniId)
       );
 
-      // Update: only university admins for the complaint's uni or super-admin
       allow update: if request.auth != null && (
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        exists(/databases/$(database)/documents/universities/$(resource.data.uniId)/admins/$(request.auth.uid))
+        isSuperAdmin(request.auth.uid) ||
+        isUniAdmin(request.auth.uid, resource.data.uniId)
       );
 
-      // Delete: owner or super-admin
       allow delete: if request.auth != null && (
         resource.data.studentId == request.auth.uid ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+        isSuperAdmin(request.auth.uid)
       );
+    }
+
+    // ==========================================================
+    // 4. UNIVERSITIES & SUBCOLLECTIONS
+    // ==========================================================
+    match /universities/{uni} {
+      allow read: if true;
+      allow write: if request.auth != null && (isSuperAdmin(request.auth.uid) || isUniAdmin(request.auth.uid, uni));
+
+      // University-level Complaints (Mirrored)
+      match /complaints/{complaintId} {
+        allow create: if request.auth != null
+          && (
+               request.resource.data.studentId == request.auth.uid || 
+               request.resource.data.studentId == 'ANONYMOUS_USER'
+             )
+          && request.resource.data.uniId == uni;
+
+        allow read: if request.auth != null && (
+          resource.data.studentId == request.auth.uid ||
+          isUniAdmin(request.auth.uid, uni) ||
+          isSuperAdmin(request.auth.uid)
+        );
+
+        allow update: if request.auth != null && (
+          isUniAdmin(request.auth.uid, uni) ||
+          isSuperAdmin(request.auth.uid)
+        );
+
+        allow delete: if request.auth != null && (
+          resource.data.studentId == request.auth.uid ||
+          isSuperAdmin(request.auth.uid)
+        );
+      }
+
+      // Timetables
+      match /timetables/{tt} {
+        allow read: if true;
+        allow write: if request.auth != null && (
+          isSuperAdmin(request.auth.uid) ||
+          isDeptAdmin(request.auth.uid, uni, request.resource.data.departmentId)
+        );
+      }
+
+      // Marketplace Items
+      match /marketplace_items/{itemId} {
+        allow read: if true;
+        allow create: if request.auth != null && (
+          isSuperAdmin(request.auth.uid) ||
+          isUniAdmin(request.auth.uid, uni) ||
+          (
+            getSmartUniId(request.auth.uid) == uni &&
+            request.resource.data.uid == request.auth.uid
+          )
+        );
+        allow update, delete: if request.auth != null && (
+          request.auth.uid == resource.data.uid ||
+          isUniAdmin(request.auth.uid, uni) ||
+          isSuperAdmin(request.auth.uid)
+        );
+      }
+
+      // AI Planner
+      match /ai_planner/{userDoc} {
+        allow read, write: if request.auth != null && (
+          request.auth.uid == userDoc ||
+          isUniAdmin(request.auth.uid, uni) ||
+          isSuperAdmin(request.auth.uid)
+        );
+        match /{subCollection=**} {
+          allow read, write: if request.auth != null && (
+            request.auth.uid == userDoc ||
+            isUniAdmin(request.auth.uid, uni) ||
+            isSuperAdmin(request.auth.uid)
+          );
+        }
+      }
+
+      match /{subCollection=**} {
+        allow read: if true;
+        allow write: if request.auth != null && (isSuperAdmin(request.auth.uid) || isUniAdmin(request.auth.uid, uni));
+      }
+    }
+
+    // ==========================================================
+    // 5. POSTS (Lost & Found Root)
+    // ==========================================================
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null && (
+        resource.data.uid == request.auth.uid ||
+        isSuperAdmin(request.auth.uid)
+      );
+    }
+
+    match /super_admins/{uid} {
+      allow read, write: if request.auth != null && isSuperAdmin(request.auth.uid);
     }
 
     // Jobs collection stored at root

@@ -62,12 +62,59 @@ class AdminComplaintList extends StatelessWidget {
             ),
           ),
         ),
-        body: TabBarView(
-          physics: const NeverScrollableScrollPhysics(),
+        body: Column(
           children: [
-            _buildComplaintList(),
-            _buildComplaintList(),
-            _buildComplaintList(),
+            Obx(() {
+              if (controller.isSuperAdmin.value) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Text('University:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Obx(() {
+                          final items = controller.universities;
+                          return DropdownButtonFormField<String>(
+                            value: controller.selectedUniId.value.isEmpty
+                                ? null
+                                : controller.selectedUniId.value,
+                            items: [
+                              const DropdownMenuItem<String>(
+                                  value: '', child: Text('All Universities')),
+                              ...items
+                                  .map((m) => DropdownMenuItem<String>(
+                                        value: m['id'] ?? '',
+                                        child: Text(m['name'] ?? m['id'] ?? ''),
+                                      ))
+                                  .toList(),
+                            ],
+                            onChanged: (v) {
+                              controller.setSelectedUniversity(v ?? '');
+                            },
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }),
+            Expanded(
+              child: TabBarView(
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildComplaintList(),
+                  _buildComplaintList(),
+                  _buildComplaintList(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -134,13 +181,41 @@ class AdminComplaintList extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              complaint.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  complaint.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Obx(() {
+                                  final studentName = controller.studentNames[complaint.studentId];
+                                  final uniName = controller.uniNames[complaint.uniId];
+                                  return Row(
+                                    children: [
+                                      Text(
+                                        studentName != null && studentName.isNotEmpty
+                                            ? 'By: $studentName'
+                                            : (complaint.isAnonymous ? 'By: Anonymous' : 'By: ${complaint.studentId}'),
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      if (complaint.uniId.isNotEmpty)
+                                        Text(
+                                          uniName != null && uniName.isNotEmpty
+                                              ? 'University: $uniName'
+                                              : 'University: ${complaint.uniId}',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                        ),
+                                    ],
+                                  );
+                                }),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 8),

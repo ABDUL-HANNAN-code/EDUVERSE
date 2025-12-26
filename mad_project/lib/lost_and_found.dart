@@ -30,6 +30,22 @@ class PhoneValidator {
   }
 }
 
+// Sanitize phone for WhatsApp / tel URIs.
+// Returns digits-only international number (no +) suitable for wa.me links.
+String sanitizePhoneForWhatsApp(String phone) {
+  if (phone == null) return '';
+  String p = phone.toString().trim();
+  if (p.isEmpty) return '';
+  // Strip all non-digit characters
+  String digits = p.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return '';
+  // If number starts with a local 0 (e.g., 0311...), convert to country code 92
+  if (digits.startsWith('0')) {
+    digits = '92' + digits.substring(1);
+  }
+  return digits;
+}
+
 // ==========================================
 // HELPER WIDGET FOR IMAGE DISPLAY
 // ==========================================
@@ -1350,7 +1366,7 @@ class _CreatePostViewState extends State<CreatePostView> {
     }
     if (!PhoneValidator.isValidPhone(_phone.text)) {
       Get.snackbar(
-          "Error", "Phone format invalid. Use +923115428907 or 03115428907",
+          "Error", "Phone format invalid. Use +923295008120 or 03295008120",
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.shade100);
       return;
@@ -1723,9 +1739,22 @@ class _PostDetailViewState extends State<PostDetailView> {
 
   @override
   Widget build(BuildContext context) {
-    final snap = widget.snap;
-    var isOwner = currentUserUid.isNotEmpty && currentUserUid == snap['uid'];
-    final postUni = (snap['uniId'] ?? '').toString();
+    final dynamic snap = widget.snap;
+    Map<String, dynamic>? data;
+    String docId = '';
+    if (snap is DocumentSnapshot) {
+      data = snap.data() as Map<String, dynamic>?;
+      docId = snap.id;
+    } else if (snap is QueryDocumentSnapshot) {
+      data = snap.data() as Map<String, dynamic>?;
+      docId = snap.id;
+    } else if (snap is Map<String, dynamic>) {
+      data = snap as Map<String, dynamic>?;
+    }
+
+    var isOwner =
+        currentUserUid.isNotEmpty && currentUserUid == (data?['uid'] ?? '');
+    final postUni = (data?['uniId'] ?? '').toString();
     final canEditOrDelete = isOwner ||
         currentUserRole == 'super_admin' ||
         (currentUserRole == 'uni_admin' && postUni == currentUserUni);
@@ -1804,7 +1833,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SmartImageDisplay(
-                        imageData: snap['postUrl'],
+                        imageData: data?['postUrl'] ?? '',
                         height: 300,
                         width: double.infinity,
                         fit: BoxFit.cover,
@@ -1815,7 +1844,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              snap['title'],
+                              data?['title'] ?? '',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
@@ -1824,7 +1853,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              "Posted by: ${snap['username']}",
+                              "Posted by: ${data?['username'] ?? ''}",
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[600],
@@ -1847,15 +1876,16 @@ class _PostDetailViewState extends State<PostDetailView> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: snap['postType'] == 'Lost'
-                                      ? const Color(0xFFE53935)
-                                      : const Color(0xFF43A047),
+                                  color:
+                                      (data?['postType'] ?? 'Found') == 'Lost'
+                                          ? const Color(0xFFE53935)
+                                          : const Color(0xFF43A047),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              snap['description'],
+                              data?['description'] ?? '',
                               style: const TextStyle(
                                 fontSize: 15,
                                 height: 1.5,
@@ -1869,7 +1899,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                                     size: 20, color: Color(0xFF666666)),
                                 const SizedBox(width: 8),
                                 Text(
-                                  snap['location'],
+                                  data?['location'] ?? '',
                                   style: const TextStyle(
                                     fontSize: 15,
                                     color: Color(0xFF666666),
@@ -1884,23 +1914,37 @@ class _PostDetailViewState extends State<PostDetailView> {
                                 height: 50,
                                 child: ElevatedButton(
                                   onPressed: () async {
-                                    String phone =
-                                        (snap['phone'] ?? '').toString().trim();
+                                    String phone = (data?['phone'] ?? '')
+                                        .toString()
+                                        .trim();
                                     if (phone.isEmpty) {
                                       Get.snackbar(
                                           "Error", "Phone number not available",
                                           snackPosition: SnackPosition.BOTTOM);
                                       return;
                                     }
+                                    // Sanitize and build whatsapp link
+                                    final waNumber =
+                                        sanitizePhoneForWhatsApp(phone);
+                                    if (waNumber.isEmpty) {
+                                      Get.snackbar(
+                                          "Error", "Invalid phone number",
+                                          snackPosition: SnackPosition.BOTTOM);
+                                      return;
+                                    }
 
-                                    // Try WhatsApp first (same behaviour as marketplace module)
                                     final waUri =
-                                        Uri.parse('https://wa.me/$phone');
+                                        Uri.parse('https://wa.me/$waNumber');
                                     try {
                                       await launchUrl(waUri);
                                     } catch (e) {
-                                      // Fallback to dialer if WhatsApp URL fails
-                                      final telUri = Uri.parse('tel:$phone');
+                                      // Fallback to tel: using international + prefix
+                                      final telNumber =
+                                          waNumber.startsWith('92')
+                                              ? '+$waNumber'
+                                              : '+$waNumber';
+                                      final telUri =
+                                          Uri.parse('tel:$telNumber');
                                       try {
                                         await launchUrl(telUri);
                                       } catch (e2) {
@@ -1957,7 +2001,15 @@ class _PostDetailViewState extends State<PostDetailView> {
             onPressed: () async {
               Get.back();
               try {
-                await FirestoreMethods().deletePost(widget.snap['postId']);
+                final dynamic s = widget.snap;
+                String id = '';
+                if (s is DocumentSnapshot)
+                  id = s.id;
+                else if (s is QueryDocumentSnapshot)
+                  id = s.id;
+                else if (s is Map<String, dynamic>)
+                  id = (s['postId'] ?? '') as String;
+                await FirestoreMethods().deletePost(id);
                 Get.back();
                 Get.snackbar("Success", "Post deleted",
                     snackPosition: SnackPosition.BOTTOM,

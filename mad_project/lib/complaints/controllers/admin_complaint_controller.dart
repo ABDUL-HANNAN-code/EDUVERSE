@@ -20,11 +20,16 @@ class AdminComplaintController extends GetxController {
   final replyController = TextEditingController();
   final selectedStatus = Rx<ComplaintStatus?>(null);
   final selectedUniId = ''.obs;
+  final isSuperAdmin = false.obs;
+  final studentNames = <String, String>{}.obs;
+  final uniNames = <String, String>{}.obs;
+  final universities = <Map<String, String>>[].obs; // list of {id,name}
   StreamSubscription<List<ComplaintModel>>? _complaintSub;
 
   @override
   void onInit() {
     super.onInit();
+    _loadUserRoleAndUniversities();
     loadComplaints();
   }
 
@@ -78,6 +83,7 @@ class AdminComplaintController extends GetxController {
         print(
             'AdminComplaintController: received ${dataList.length} complaints');
         complaints.value = dataList;
+        _populateNamesForComplaints(dataList);
         isLoading.value = false;
       }, onError: (error) {
         isLoading.value = false;
@@ -146,6 +152,79 @@ class AdminComplaintController extends GetxController {
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.shade100,
           colorText: Colors.red.shade900);
+    }
+  }
+
+  Future<void> _loadUserRoleAndUniversities() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final data = doc.data() ?? {};
+      final role = data['role']?.toString() ?? '';
+      isSuperAdmin.value = (role == 'super_admin');
+
+      if (isSuperAdmin.value) {
+        // Load list of universities for selection
+        final snap = await FirebaseFirestore.instance
+            .collection('universities')
+            .orderBy('name')
+            .get();
+        universities.clear();
+        uniNames.clear();
+        for (var d in snap.docs) {
+          final name = (d.data() as Map<String, dynamic>)['name'] ?? '';
+          universities.add({'id': d.id, 'name': name});
+          uniNames[d.id] = name;
+        }
+      }
+    } catch (e) {
+      print('AdminComplaintController: failed to load role/universities: $e');
+    }
+  }
+
+  Future<void> _populateNamesForComplaints(List<ComplaintModel> list) async {
+    // Collect unique studentIds and uniIds
+    final studentIds = <String>{};
+    final uniIds = <String>{};
+    for (var c in list) {
+      if (c.studentId.isNotEmpty && c.studentId != 'ANONYMOUS_USER') {
+        studentIds.add(c.studentId);
+      }
+      if (c.uniId.isNotEmpty) uniIds.add(c.uniId);
+    }
+
+    try {
+      // Fetch missing student names
+      final missingStudents = studentIds.where((id) => !studentNames.containsKey(id)).toList();
+      if (missingStudents.isNotEmpty) {
+        final futures = missingStudents.map((id) async {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+            final data = doc.data() ?? {};
+            final name = (data['name'] ?? data['displayName'] ?? '') as String;
+            if (name.isNotEmpty) studentNames[id] = name;
+          } catch (_) {}
+        });
+        await Future.wait(futures);
+      }
+
+      // Fetch missing university names
+      final missingUnis = uniIds.where((id) => !uniNames.containsKey(id)).toList();
+      if (missingUnis.isNotEmpty) {
+        final futures = missingUnis.map((id) async {
+          try {
+            final doc = await FirebaseFirestore.instance.collection('universities').doc(id).get();
+            final data = doc.data() ?? {};
+            final name = (data['name'] ?? '') as String;
+            if (name.isNotEmpty) uniNames[id] = name;
+          } catch (_) {}
+        });
+        await Future.wait(futures);
+      }
+    } catch (e) {
+      print('AdminComplaintController: error populating names: $e');
     }
   }
 
