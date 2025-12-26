@@ -3,6 +3,9 @@
 
 import 'package:flutter/material.dart';
 import '../../auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -564,53 +567,7 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Pending Requests (if any)
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('job_requests')
-                        .where('recruiterId', isEqualTo: user.uid)
-                        .where('status', isEqualTo: 'pending')
-                        .orderBy('createdAt', descending: true)
-                        .snapshots(),
-                    builder: (context, snap) {
-                      if (!snap.hasData || snap.data!.docs.isEmpty)
-                        return const SizedBox.shrink();
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          const Text('Pending Requests',
-                              style: TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          ...snap.data!.docs.map((d) {
-                            final Map jd =
-                                (d.data() as Map<String, dynamic>)['job'] ?? {};
-                            return Card(
-                              child: ListTile(
-                                title: Text(jd['title'] ?? 'Untitled'),
-                                subtitle: Text(
-                                    'Target: ${d['targetUniversity'] ?? 'N/A'}'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Text('Pending',
-                                        style: TextStyle(color: Colors.orange)),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete,
-                                          color: Colors.red),
-                                      tooltip: 'Delete request',
-                                      onPressed: () => _deleteRequest(d.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      );
-                    },
-                  ),
+                  // Pending Requests UI removed per configuration (requests handled immediately)
 
                   // DEBUG: show all requests for this recruiter (helps verify pending/approved/jobId)
                   StreamBuilder<QuerySnapshot>(
@@ -1572,6 +1529,104 @@ class JobApplicationsScreen extends StatelessWidget {
 
   JobApplicationsScreen({Key? key, required this.job}) : super(key: key);
 
+  Future<void> _openResume(BuildContext context, String resumeUrl) async {
+    if (resumeUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No resume available')),
+      );
+      return;
+    }
+
+    try {
+      if (resumeUrl.startsWith('data:application/pdf;base64,')) {
+        final uri = Uri.parse(resumeUrl);
+        if (kIsWeb) {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            return;
+          }
+        }
+
+        // Fallback: show dialog with copy option
+        if (!context.mounted) return;
+        showDialog(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Resume (base64)'),
+            content: SingleChildScrollView(
+              child: SelectableText('The resume is stored as base64 PDF data.'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: resumeUrl));
+                  if (c.mounted) Navigator.pop(c);
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Base64 data copied to clipboard')),
+                  );
+                },
+                child: const Text('Copy data'),
+              ),
+              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+            ],
+          ),
+        );
+      } else {
+        final uri = Uri.parse(resumeUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open resume URL')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening resume: $e')));
+    }
+  }
+
+  Future<void> _downloadResume(BuildContext context, String resumeUrl) async {
+    if (resumeUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No resume available')),
+      );
+      return;
+    }
+
+    try {
+      if (resumeUrl.startsWith('data:application/pdf;base64,')) {
+        final uri = Uri.parse(resumeUrl);
+        if (kIsWeb) {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download should start in your browser.')));
+            return;
+          }
+        }
+
+        // Mobile fallback: copy base64 to clipboard with instructions
+        if (context.mounted) {
+          await Clipboard.setData(ClipboardData(text: resumeUrl));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Base64 data copied to clipboard. Paste in browser address bar to download.')),
+          );
+        }
+      } else {
+        final uri = Uri.parse(resumeUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not download resume URL')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error downloading resume: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1649,12 +1704,32 @@ class JobApplicationsScreen extends StatelessWidget {
                       Text(app['university'] ?? ''),
                     ],
                   ),
-                  trailing: Chip(
-                    label: Text(
-                      app['status'] ?? 'pending',
-                      style: const TextStyle(fontSize: 12),
+                  trailing: SizedBox(
+                    width: 120,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // status badge removed per request
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'View resume',
+                          onPressed: () async {
+                            final url = (app['resumeUrl'] ?? '') as String;
+                            await _openResume(context, url);
+                          },
+                          icon: const Icon(Icons.visibility_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Download resume',
+                          onPressed: () async {
+                            final url = (app['resumeUrl'] ?? '') as String;
+                            await _downloadResume(context, url);
+                          },
+                          icon: const Icon(Icons.download_outlined),
+                        ),
+                      ],
                     ),
-                    backgroundColor: Colors.orange[100],
                   ),
                 ),
               );

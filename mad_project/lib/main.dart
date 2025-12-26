@@ -23,7 +23,7 @@ import 'homepage/admin_dashboard.dart';
 import 'ai_study_planner/ai_study_planner.dart';
 // Placement module (student & recruiter)
 import 'timetable/placements/student_placement_screen.dart';
-import 'timetable/placements/recruiter_admin_panel.dart';
+import 'timetable/placements/recruiter_admin_panel.dart' hide LoginView;
 // Recruiter admin auth removed - use `auth.dart`'s `LoginView`
 
 void main() async {
