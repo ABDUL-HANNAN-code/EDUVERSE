@@ -8,6 +8,7 @@ import 'dart:io' show File;
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:math';
 
 // ==================== MODELS ====================
 
@@ -170,10 +171,8 @@ class StudentAuthService {
         password: password,
       );
 
-      DocumentSnapshot userDoc = await _firestore
-          .collection('users')
-          .doc(result.user!.uid)
-          .get();
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(result.user!.uid).get();
 
       if (!userDoc.exists) {
         await _auth.signOut();
@@ -196,7 +195,10 @@ class StudentAuthService {
     } on FirebaseAuthException catch (e) {
       return {'success': false, 'message': _getErrorMessage(e.code)};
     } catch (e) {
-      return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}'
+      };
     }
   }
 
@@ -226,7 +228,10 @@ class StudentAuthService {
     } on FirebaseAuthException catch (e) {
       return {'success': false, 'message': _getErrorMessage(e.code)};
     } catch (e) {
-      return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}'
+      };
     }
   }
 
@@ -236,7 +241,8 @@ class StudentAuthService {
 
   Future<StudentUser?> getStudentData(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         return StudentUser.fromFirestore(doc);
       }
@@ -280,17 +286,17 @@ class StudentFirestoreService {
       return snapshot.docs
           .map((doc) => JobOpportunity.fromFirestore(doc))
           .where((job) {
-            return job.targetUniversity == 'All Universities' ||
-                   job.targetUniversity == studentUniversity;
-          })
-          .toList();
+        return job.targetUniversity == 'All Universities' ||
+            job.targetUniversity == studentUniversity;
+      }).toList();
     });
   }
 
   Future<Map<String, dynamic>> applyForJob(JobApplication application) async {
     try {
-      print('DEBUG: Checking existing applications for jobId: ${application.jobId}, studentId: ${application.studentId}');
-      
+      print(
+          'DEBUG: Checking existing applications for jobId: ${application.jobId}, studentId: ${application.studentId}');
+
       QuerySnapshot existingApplication = await _firestore
           .collection('applications')
           .where('jobId', isEqualTo: application.jobId)
@@ -307,24 +313,26 @@ class StudentFirestoreService {
 
       print('DEBUG: Creating new application document');
       print('DEBUG: Application data: ${application.toMap()}');
-      
-      DocumentReference docRef = await _firestore.collection('applications').add(application.toMap());
+
+      DocumentReference docRef =
+          await _firestore.collection('applications').add(application.toMap());
       print('DEBUG: Application created with ID: ${docRef.id}');
 
-      print('DEBUG: Incrementing applicants count for job: ${application.jobId}');
+      print(
+          'DEBUG: Incrementing applicants count for job: ${application.jobId}');
       await _firestore
           .collection('jobs')
           .doc(application.jobId)
           .update({'applicantsCount': FieldValue.increment(1)});
 
       print('DEBUG: Application successful!');
-      return {'success': true, 'message': 'Application submitted successfully!'};
+      return {
+        'success': true,
+        'message': 'Application submitted successfully!'
+      };
     } catch (e) {
       print('DEBUG ERROR: $e');
-      return {
-        'success': false,
-        'message': 'Error applying: ${e.toString()}'
-      };
+      return {'success': false, 'message': 'Error applying: ${e.toString()}'};
     }
   }
 
@@ -746,17 +754,80 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
 
       final picked = result.files.first;
 
+      final int sizeBytes = picked.size ?? 0;
+      final String name = picked.name;
+      final String ext =
+          (picked.extension ?? name.split('.').last).toLowerCase();
+      const int maxBytes = 5 * 1024 * 1024; // 5 MB limit
+
+      // Validate format
+      if (ext != 'pdf') {
+        await showDialog<void>(
+          context: context,
+          builder: (c) => AlertDialog(
+            title: const Text('Invalid format'),
+            content: const Text('Please upload your resume as a PDF file.'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(c), child: const Text('OK')),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // Show confirmation with size and rules
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Resume upload'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('File: $name'),
+              const SizedBox(height: 6),
+              Text('Size: ${_formatBytes(sizeBytes)}'),
+              const SizedBox(height: 6),
+              const Text('Allowed format: PDF'),
+              const SizedBox(height: 6),
+              Text('Max size: ${_formatBytes(maxBytes)}'),
+              if (sizeBytes > maxBytes) ...[
+                const SizedBox(height: 8),
+                const Text('This file exceeds the allowed size.',
+                    style: TextStyle(color: Colors.red)),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Cancel')),
+            TextButton(
+              onPressed:
+                  sizeBytes > maxBytes ? null : () => Navigator.pop(c, true),
+              child: const Text('Upload'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Uploading resume...')),
       );
 
-      final storageRef = FirebaseStorage.instance.ref().child('resumes/${user.uid}/${picked.name}');
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('resumes/${user.uid}/${picked.name}');
 
       UploadTask uploadTask;
       if (kIsWeb) {
         final bytes = picked.bytes;
         if (bytes == null) return;
-        uploadTask = storageRef.putData(bytes, SettableMetadata(contentType: 'application/pdf'));
+        uploadTask = storageRef.putData(
+            bytes, SettableMetadata(contentType: 'application/pdf'));
       } else {
         final path = picked.path;
         if (path == null) return;
@@ -766,7 +837,10 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
       final snapshot = await uploadTask;
       final url = await snapshot.ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'resumeUrl': url});
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({'resumeUrl': url});
 
       await _loadStudentData();
 
@@ -784,6 +858,14 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
         ),
       );
     }
+  }
+
+  String _formatBytes(int bytes, [int decimals = 2]) {
+    if (bytes <= 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB'];
+    final i = (log(bytes) / log(1024)).floor();
+    final size = bytes / pow(1024, i);
+    return '${size.toStringAsFixed(decimals)} ${suffixes[i]}';
   }
 
   Future<void> _handleSignOut() async {
@@ -988,7 +1070,8 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
               const SizedBox(height: 16),
               StreamBuilder<List<JobOpportunity>>(
                 stream: _studentData != null
-                    ? _firestoreService.getFilteredJobs(_studentData!.university)
+                    ? _firestoreService
+                        .getFilteredJobs(_studentData!.university)
                     : null,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1021,9 +1104,11 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                         padding: const EdgeInsets.all(40),
                         child: Column(
                           children: [
-                            Icon(Icons.work_off_outlined, size: 80, color: Colors.grey[400]),
+                            Icon(Icons.work_off_outlined,
+                                size: 80, color: Colors.grey[400]),
                             const SizedBox(height: 16),
-                            Text('No opportunities available', style: TextStyle(color: Colors.grey[600])),
+                            Text('No opportunities available',
+                                style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
                       ),
@@ -1151,7 +1236,8 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                       padding: const EdgeInsets.all(16),
                       itemCount: applications.length,
                       itemBuilder: (context, index) {
-                        final app = applications[index].data() as Map<String, dynamic>;
+                        final app =
+                            applications[index].data() as Map<String, dynamic>;
                         return FutureBuilder<DocumentSnapshot>(
                           future: FirebaseFirestore.instance
                               .collection('jobs')
@@ -1162,7 +1248,8 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                               return const SizedBox.shrink();
                             }
 
-                            final job = JobOpportunity.fromFirestore(jobSnapshot.data!);
+                            final job =
+                                JobOpportunity.fromFirestore(jobSnapshot.data!);
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -1266,10 +1353,12 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).padding.bottom + 8),
+            padding: EdgeInsets.fromLTRB(
+                16, 16, 16, 16 + MediaQuery.of(context).padding.bottom + 8),
             child: Column(
               children: [
-                if (_studentData?.resumeUrl != null && _studentData!.resumeUrl!.isNotEmpty)
+                if (_studentData?.resumeUrl != null &&
+                    _studentData!.resumeUrl!.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),
                     padding: const EdgeInsets.all(16),
@@ -1280,7 +1369,8 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
+                        const Icon(Icons.check_circle,
+                            color: Color(0xFF2E7D32)),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Text(
@@ -1296,7 +1386,8 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                   ),
                 _buildProfileOption(
                   Icons.description_outlined,
-                  _studentData?.resumeUrl != null && _studentData!.resumeUrl!.isNotEmpty
+                  _studentData?.resumeUrl != null &&
+                          _studentData!.resumeUrl!.isNotEmpty
                       ? 'Update Resume'
                       : 'Upload Resume',
                   () => _uploadResumeHandler(),
@@ -1565,7 +1656,8 @@ class StudentJobCard extends StatelessWidget {
               }
 
               return FutureBuilder<bool>(
-                future: StudentFirestoreService().isBookmarked(studentId!, job.id),
+                future:
+                    StudentFirestoreService().isBookmarked(studentId!, job.id),
                 builder: (context, snapshot) {
                   final isBookmarked = snapshot.data ?? false;
                   return IconButton(
@@ -1695,9 +1787,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     // RESUME VALIDATION: Check if student has uploaded a resume
     if (student.resumeUrl == null || student.resumeUrl!.isEmpty) {
       setState(() => _isLoading = false);
-      
+
       print('DEBUG: RESUME CHECK FAILED - No resume found!');
-      
+
       final shouldUpload = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1705,7 +1797,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
           content: const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.description_outlined, size: 64, color: Color(0xFF5E2686)),
+              Icon(Icons.description_outlined,
+                  size: 64, color: Color(0xFF5E2686)),
               SizedBox(height: 16),
               Text(
                 'You need to upload your resume before applying to jobs.',
@@ -1741,8 +1834,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       }
       return;
     }
-    
-    print('DEBUG: RESUME CHECK PASSED - Resume URL exists: ${student.resumeUrl}');
+
+    print(
+        'DEBUG: RESUME CHECK PASSED - Resume URL exists: ${student.resumeUrl}');
 
     // Create application with all required fields
     print('DEBUG: Creating application with:');
@@ -1762,8 +1856,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     );
 
     final result = await _firestoreService.applyForJob(application);
-    
-    print('DEBUG: Application result: ${result['success']} - ${result['message']}');
+
+    print(
+        'DEBUG: Application result: ${result['success']} - ${result['message']}');
 
     setState(() => _isLoading = false);
 
@@ -1928,9 +2023,8 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             child: ElevatedButton(
               onPressed: _hasApplied || _isLoading ? null : _applyForJob,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _hasApplied
-                    ? Colors.grey
-                    : const Color(0xFF5E2686),
+                backgroundColor:
+                    _hasApplied ? Colors.grey : const Color(0xFF5E2686),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),

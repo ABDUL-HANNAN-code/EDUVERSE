@@ -1,11 +1,17 @@
 // File: lib/modules/placement/screens/recruiter_admin_panel.dart
 // Complete Recruiter Admin Panel with Firebase Authentication & Firestore
 
+import 'dart:io'; // ADDED: For File operations
+import 'dart:convert'; // ADDED: For base64Decode
+import 'dart:typed_data'; // ADDED: For Uint8List
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart'; // ADDED: For saving files
 import '../../auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'web_download.dart' show triggerDownload;
+import 'resume_viewer.dart' show ResumeViewerPage;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -567,9 +573,8 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Pending Requests UI removed per configuration (requests handled immediately)
-
-                  // DEBUG: show all requests for this recruiter (helps verify pending/approved/jobId)
+                  
+                  // Show all non-approved requests for this recruiter
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('job_requests')
@@ -580,17 +585,27 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                       if (!snap.hasData || snap.data!.docs.isEmpty) {
                         return const SizedBox.shrink();
                       }
+
+                      // Filter out requests that have already been approved
+                      final docs = snap.data!.docs.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final status = (data['status'] ?? '') as String;
+                        return status.toLowerCase() != 'approved';
+                      }).toList();
+
+                      if (docs.isEmpty) return const SizedBox.shrink();
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16.0, vertical: 8.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('All Requests (debug)',
+                            const Text('All Requests',
                                 style: TextStyle(
                                     fontSize: 14, fontWeight: FontWeight.w600)),
                             const SizedBox(height: 8),
-                            ...snap.data!.docs.map((d) {
+                            ...docs.map((d) {
                               final data = d.data() as Map<String, dynamic>;
                               return Card(
                                 child: ListTile(
@@ -1529,7 +1544,7 @@ class JobApplicationsScreen extends StatelessWidget {
 
   JobApplicationsScreen({Key? key, required this.job}) : super(key: key);
 
-  Future<void> _openResume(BuildContext context, String resumeUrl) async {
+Future<void> _openResume(BuildContext context, String resumeUrl) async {
     if (resumeUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No resume available')),
@@ -1537,56 +1552,14 @@ class JobApplicationsScreen extends StatelessWidget {
       return;
     }
 
-    try {
-      if (resumeUrl.startsWith('data:application/pdf;base64,')) {
-        final uri = Uri.parse(resumeUrl);
-        if (kIsWeb) {
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-            return;
-          }
-        }
-
-        // Fallback: show dialog with copy option
-        if (!context.mounted) return;
-        showDialog(
-          context: context,
-          builder: (c) => AlertDialog(
-            title: const Text('Resume (base64)'),
-            content: SingleChildScrollView(
-              child: SelectableText('The resume is stored as base64 PDF data.'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: resumeUrl));
-                  if (c.mounted) Navigator.pop(c);
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Base64 data copied to clipboard')),
-                  );
-                },
-                child: const Text('Copy data'),
-              ),
-              TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
-            ],
-          ),
-        );
-      } else {
-        final uri = Uri.parse(resumeUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open resume URL')),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error opening resume: $e')));
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (c) => ResumeViewerPage(resumeUrl: resumeUrl)),
+    );
   }
 
-  Future<void> _downloadResume(BuildContext context, String resumeUrl) async {
+  Future<void> _downloadResume(BuildContext context, String resumeUrl, String userName) async {
     if (resumeUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No resume available')),
@@ -1595,24 +1568,47 @@ class JobApplicationsScreen extends StatelessWidget {
     }
 
     try {
+      // Clean filename
+      String filename = '${userName.replaceAll(RegExp(r'\s+'), '_')}_Resume.pdf';
+
       if (resumeUrl.startsWith('data:application/pdf;base64,')) {
-        final uri = Uri.parse(resumeUrl);
         if (kIsWeb) {
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download should start in your browser.')));
-            return;
+          await triggerDownload(resumeUrl, filename: filename);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Download started')));
           }
+          return;
         }
 
-        // Mobile fallback: copy base64 to clipboard with instructions
-        if (context.mounted) {
-          await Clipboard.setData(ClipboardData(text: resumeUrl));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Base64 data copied to clipboard. Paste in browser address bar to download.')),
-          );
+        // Mobile: Write bytes to file
+        try {
+          final String base64Str = resumeUrl.split(',').last;
+          final Uint8List bytes = base64Decode(base64Str);
+
+          // Get directory (Documents directory is safe for app files)
+          final Directory dir = await getApplicationDocumentsDirectory();
+          final File file = File('${dir.path}/$filename');
+
+          await file.writeAsBytes(bytes);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved to ${file.path}'),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error saving file: $e')),
+            );
+          }
         }
       } else {
+        // Handle URL download if needed
         final uri = Uri.parse(resumeUrl);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -1623,7 +1619,9 @@ class JobApplicationsScreen extends StatelessWidget {
         }
       }
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error downloading resume: $e')));
+      if (context.mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error downloading resume: $e')));
     }
   }
 
@@ -1724,7 +1722,8 @@ class JobApplicationsScreen extends StatelessWidget {
                           tooltip: 'Download resume',
                           onPressed: () async {
                             final url = (app['resumeUrl'] ?? '') as String;
-                            await _downloadResume(context, url);
+                            final name = (app['studentName'] ?? 'Student') as String;
+                            await _downloadResume(context, url, name);
                           },
                           icon: const Icon(Icons.download_outlined),
                         ),
