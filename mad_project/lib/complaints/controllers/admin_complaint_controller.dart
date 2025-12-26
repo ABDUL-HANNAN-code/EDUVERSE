@@ -21,7 +21,7 @@ class AdminComplaintController extends GetxController {
   final selectedStatus = Rx<ComplaintStatus?>(null);
   final selectedUniId = ''.obs;
   final isSuperAdmin = false.obs;
-  final studentNames = <String, String>{}.obs;
+  final studentProfiles = <String, Map<String, String>>{}.obs;
   final uniNames = <String, String>{}.obs;
   final universities = <Map<String, String>>[].obs; // list of {id,name}
   StreamSubscription<List<ComplaintModel>>? _complaintSub;
@@ -196,26 +196,45 @@ class AdminComplaintController extends GetxController {
     }
 
     try {
-      // Fetch missing student names
-      final missingStudents = studentIds.where((id) => !studentNames.containsKey(id)).toList();
-      if (missingStudents.isNotEmpty) {
-        final futures = missingStudents.map((id) async {
-          try {
-            final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
-            final data = doc.data() ?? {};
-            final name = (data['name'] ?? data['displayName'] ?? '') as String;
-            if (name.isNotEmpty) studentNames[id] = name;
-          } catch (_) {}
-        });
-        await Future.wait(futures);
-      }
+        // Fetch missing student profiles (name, dept, section, semester, shift)
+        final missingStudents = studentIds.where((id) => !studentProfiles.containsKey(id)).toList();
+        if (missingStudents.isNotEmpty) {
+          final futures = missingStudents.map((id) async {
+            try {
+              final doc = await FirebaseFirestore.instance.collection('users').doc(id).get();
+              final data = doc.data() ?? {};
+              final name = (data['name'] ?? data['displayName'] ?? '') as String;
+              final deptId = (data['departmentId'] ?? '') as String;
+              final deptName = (data['departmentName'] ?? data['department'] ?? '') as String;
+              final sectionId = (data['sectionId'] ?? '') as String;
+              final sectionName = (data['sectionName'] ?? data['section'] ?? '') as String;
+              final semester = (data['semester']?.toString() ?? '') as String;
+              final shift = (data['shift'] ?? '') as String;
+
+              studentProfiles[id] = {
+                'name': name,
+                'deptId': deptId,
+                'deptName': deptName,
+                'sectionId': sectionId,
+                'sectionName': sectionName,
+                'semester': semester,
+                'shift': shift,
+              };
+            } catch (_) {}
+          });
+          await Future.wait(futures);
+        }
 
       // Fetch missing university names
-      final missingUnis = uniIds.where((id) => !uniNames.containsKey(id)).toList();
+      final missingUnis =
+          uniIds.where((id) => !uniNames.containsKey(id)).toList();
       if (missingUnis.isNotEmpty) {
         final futures = missingUnis.map((id) async {
           try {
-            final doc = await FirebaseFirestore.instance.collection('universities').doc(id).get();
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(id)
+                .get();
             final data = doc.data() ?? {};
             final name = (data['name'] ?? '') as String;
             if (name.isNotEmpty) uniNames[id] = name;
@@ -223,6 +242,45 @@ class AdminComplaintController extends GetxController {
         });
         await Future.wait(futures);
       }
+      // Attempt to resolve department/section names from university subcollections
+      for (var id in studentProfiles.keys) {
+        final prof = studentProfiles[id]!;
+        final deptId = prof['deptId'] ?? '';
+        final sectionId = prof['sectionId'] ?? '';
+        final uniIdForStudent = (list.firstWhere((c) => c.studentId == id, orElse: () => ComplaintModel(id: '', title: '', description: '', category: ComplaintCategory.other, urgency: ComplaintUrgency.low, status: ComplaintStatus.pending, isAnonymous: false, studentId: '', uniId: '', deptId: '', createdAt: DateTime.now()))).uniId;
+        if ((prof['deptName'] ?? '').isEmpty && deptId.isNotEmpty && uniIdForStudent.isNotEmpty) {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(uniIdForStudent)
+                .collection('departments')
+                .doc(deptId)
+                .get();
+            final data = doc.data() ?? {};
+            final resolved = (data['name'] ?? data['title'] ?? '') as String;
+            if (resolved.isNotEmpty) {
+              studentProfiles[id]!['deptName'] = resolved;
+            }
+          } catch (_) {}
+        }
+        if ((prof['sectionName'] ?? '').isEmpty && sectionId.isNotEmpty && uniIdForStudent.isNotEmpty) {
+          try {
+            final doc = await FirebaseFirestore.instance
+                .collection('universities')
+                .doc(uniIdForStudent)
+                .collection('sections')
+                .doc(sectionId)
+                .get();
+            final data = doc.data() ?? {};
+            final resolved = (data['name'] ?? data['title'] ?? '') as String;
+            if (resolved.isNotEmpty) {
+              studentProfiles[id]!['sectionName'] = resolved;
+            }
+          } catch (_) {}
+        }
+      }
+
+      print('AdminComplaintController: populated ${studentProfiles.length} student profiles and ${uniNames.length} uni names');
     } catch (e) {
       print('AdminComplaintController: error populating names: $e');
     }
