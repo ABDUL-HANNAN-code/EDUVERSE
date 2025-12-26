@@ -4,6 +4,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io' show File;
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // ==================== MODELS ====================
 
@@ -731,6 +735,62 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
     }
   }
 
+  Future<void> _uploadResumeHandler() async {
+    var user = _authService.currentUser;
+    if (user == null) {
+      // Prompt sign-in flow
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const StudentLoginScreen()),
+      );
+      user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in required to upload resume')),
+        );
+        return;
+      }
+    }
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        withData: kIsWeb,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final picked = result.files.first;
+
+      final storageRef = FirebaseStorage.instance.ref().child('resumes/${user.uid}/${picked.name}');
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final bytes = picked.bytes;
+        if (bytes == null) return;
+        uploadTask = storageRef.putData(bytes, SettableMetadata(contentType: 'application/pdf'));
+      } else {
+        final path = picked.path;
+        if (path == null) return;
+        uploadTask = storageRef.putFile(File(path));
+      }
+
+      final snapshot = await uploadTask;
+      final url = await snapshot.ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'resumeUrl': url});
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Resume uploaded successfully')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Upload failed: $e')),
+      );
+    }
+  }
+
   Future<void> _handleSignOut() async {
     await _authService.signOut();
     Navigator.of(context).pushReplacement(
@@ -1217,7 +1277,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                 _buildProfileOption(
                   Icons.description_outlined,
                   'Upload Resume',
-                  () {},
+                  () => _uploadResumeHandler(),
                 ),
                 _buildProfileOption(
                   Icons.notifications_outlined,
@@ -1289,7 +1349,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
       MaterialPageRoute(
         builder: (context) => JobDetailsScreen(
           job: job,
-          studentData: _studentData!,
+          studentData: _studentData,
         ),
       ),
     );
@@ -1507,12 +1567,12 @@ class StudentJobCard extends StatelessWidget {
 
 class JobDetailsScreen extends StatefulWidget {
   final JobOpportunity job;
-  final StudentUser studentData;
+  final StudentUser? studentData;
 
   const JobDetailsScreen({
     Key? key,
     required this.job,
-    required this.studentData,
+    this.studentData,
   }) : super(key: key);
 
   @override
@@ -1531,9 +1591,23 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   Future<void> _checkApplicationStatus() async {
+    // If there's no student data provided, try to read current auth user
+    String? studentId = widget.studentData?.uid;
+    if (studentId == null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _hasApplied = false;
+          _isLoading = false;
+        });
+        return;
+      }
+      studentId = user.uid;
+    }
+
     final applied = await _firestoreService.hasApplied(
       widget.job.id,
-      widget.studentData.uid,
+      studentId,
     );
     setState(() {
       _hasApplied = applied;
@@ -1544,12 +1618,41 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   Future<void> _applyForJob() async {
     setState(() => _isLoading = true);
 
+    // Ensure we have student data; if not, prompt sign-in and fetch it
+    StudentUser? student = widget.studentData;
+    if (student == null) {
+      // Push login screen and wait
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const StudentLoginScreen()),
+      );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must sign in to apply')),
+        );
+        return;
+      }
+
+      final fetched = await StudentAuthService().getStudentData(user.uid);
+      if (fetched == null) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Student profile not found')),
+        );
+        return;
+      }
+      student = fetched;
+    }
+
     final application = JobApplication(
       jobId: widget.job.id,
-      studentId: widget.studentData.uid,
-      studentName: widget.studentData.name,
-      studentEmail: widget.studentData.email,
-      university: widget.studentData.university,
+      studentId: student.uid,
+      studentName: student.name,
+      studentEmail: student.email,
+      university: student.university,
     );
 
     final result = await _firestoreService.applyForJob(application);

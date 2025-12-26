@@ -164,6 +164,83 @@ service cloud.firestore {
       );
     }
 
+    // Jobs collection stored at root
+    match /jobs/{jobId} {
+      // Anyone can read active jobs
+      allow read: if true;
+
+      // Create: recruiters or super-admins (recruiterId must match caller)
+      allow create: if request.auth != null && (
+        request.auth.uid == request.resource.data.recruiterId ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
+        // university admin for job's target university
+        (request.resource.data.targetUniversity != null &&
+         exists(/databases/$(database)/documents/universities/$(request.resource.data.targetUniversity)/admins/$(request.auth.uid)))
+      );
+
+      // Update: recruiter owner or super-admin can update any fields.
+      // Additionally allow authenticated users to ONLY increment applicantsCount by 1.
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.recruiterId ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
+        (
+          // only applicantsCount key changed and it's increment by exactly 1
+          request.resource.data.keys().hasOnly(['applicantsCount']) &&
+          request.resource.data.applicantsCount == resource.data.applicantsCount + 1
+        )
+      );
+
+      // Delete: only recruiter owner or super-admin
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.recruiterId ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+      );
+    }
+
+    // Applications stored at root
+    match /applications/{appId} {
+      // Create: authenticated students may create their own application for an existing job
+      allow create: if request.auth != null &&
+        request.resource.data.studentId == request.auth.uid &&
+        request.resource.data.jobId is string &&
+        exists(/databases/$(database)/documents/jobs/$(request.resource.data.jobId)) &&
+        // status must start as 'pending'
+        request.resource.data.status == 'pending';
+
+      // Read: student owner, recruiter owning the job, or super-admin
+      allow read: if request.auth != null && (
+        resource.data.studentId == request.auth.uid ||
+        (
+          resource.data.jobId is string &&
+          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
+          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
+        ) ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+      );
+
+      // Update: recruiter owning the job or super-admin can update status/fields
+      allow update: if request.auth != null && (
+        (
+          resource.data.jobId is string &&
+          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
+          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
+        ) ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid))
+      );
+
+      // Delete: owner (student), recruiter for job, or super-admin
+      allow delete: if request.auth != null && (
+        request.auth.uid == resource.data.studentId ||
+        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
+        (
+          resource.data.jobId is string &&
+          exists(/databases/$(database)/documents/jobs/$(resource.data.jobId)) &&
+          get(/databases/$(database)/documents/jobs/$(resource.data.jobId)).data.recruiterId == request.auth.uid
+        )
+      );
+    }
+
+    // Default: deny everything else
     match /{document=**} {
       allow read, write: if false;
     }

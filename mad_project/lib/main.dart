@@ -22,6 +22,9 @@ import 'ai_study_planner/ai_study_planner.dart';
 // Placement module (student & recruiter)
 import 'timetable/PLACEMENTS/student_placement_screen.dart';
 import 'timetable/PLACEMENTS/recruiter_admin_panel.dart';
+import 'recruiter_auth.dart';
+// Welcome screen
+import 'timetable/welcome.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -130,20 +133,28 @@ class UniversityApp extends StatelessWidget {
       builder: (context, child) {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Uni App',
+          title: 'Eduverse',
           theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Poppins'),
 
-          // Decide where to start
+          // Start with the new Welcome Role Selection screen
           home: const AuthGate(),
           initialRoute: null, // Let AuthGate decide
 
           // Define Names for modules for easy navigation
           getPages: [
+            // Welcome & Auth Routes
+            GetPage(name: '/welcome', page: () => const WelcomeRoleScreen()),
             GetPage(name: '/login', page: () => const LoginView()),
+            GetPage(name: '/recruiter-login', page: () => const RecruiterAuthScreen()),
+            
+            // Main Dashboard Routes
             GetPage(
                 name: '/dashboard',
                 page: () =>
                     const HomeDashboard()), // Home Dashboard - main screen after login
+            GetPage(name: '/admin', page: () => const AdminDashboard()),
+            
+            // Feature Module Routes
             GetPage(
                 name: '/lost-and-found',
                 page: () =>
@@ -151,18 +162,18 @@ class UniversityApp extends StatelessWidget {
             GetPage(
                 name: '/timetable',
                 page: () => const TimetableScreen()), // Timetable module
-            GetPage(name: '/admin', page: () => const AdminDashboard()),
-
             GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
+            
             // Complaints module
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
             GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
             GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
+            
             // AI Study Planner module
             GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
+            
             // Placement module (student & recruiter)
             GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
-            GetPage(name: '/recruiter-login', page: () => const RecruiterLoginScreen()),
             GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
           ],
         );
@@ -171,16 +182,25 @@ class UniversityApp extends StatelessWidget {
   }
 }
 
+/// AuthGate: Smart routing based on authentication state
+/// - Not logged in -> Show Welcome Screen (Role Selection)
+/// - Logged in but email not verified -> Show Email Verification
+/// - Logged in and verified -> Show Dashboard
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
+  
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    
     if (user != null) {
+      // User is logged in
       return user.emailVerified
-          ? const HomeDashboard()
-          : const VerifyEmailView();
+          ? const HomeDashboard() // Verified -> Dashboard
+          : const VerifyEmailView(); // Not verified -> Verify email
     }
-    return const LoginView();
+    
+    // No user logged in -> Show Welcome Screen (Role Selection)
+    return const WelcomeRoleScreen();
   }
 }
