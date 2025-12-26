@@ -3,6 +3,14 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+// Optional: SendGrid for outgoing emails. Configure with `firebase functions:config:set sendgrid.key="KEY" sendgrid.sender="no-reply@yourdomain.com"`
+let sgMail;
+try {
+  sgMail = require('@sendgrid/mail');
+} catch (e) {
+  sgMail = null;
+}
+
 /**
  * Callable function to set a user's role and admin scope.
  * Only callers who are present in `/super_admins/{callerUid}` may invoke this.
@@ -66,4 +74,113 @@ exports.setUserRole = functions.https.onCall(async (data, context) => {
   await admin.auth().setCustomUserClaims(uid, claims);
 
   return { success: true };
+});
+
+/**
+ * Callable function to generate a faculty invite, persist it, and email it to the recipient.
+ * Only callers who are `admin` or present in `/super_admins/{callerUid}` can create invites.
+ * Payload: { email: string }
+ */
+exports.createFacultyInvite = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+  }
+
+  const callerUid = context.auth.uid;
+  const db = admin.firestore();
+
+  // Check caller role (admin) or super_admins collection
+  const callerDoc = await db.doc(`users/${callerUid}`).get();
+  const callerRole = callerDoc.exists ? (callerDoc.data().role || '') : '';
+  const isSuper = (await db.doc(`super_admins/${callerUid}`).get()).exists;
+  if (!(callerRole === 'admin' || isSuper)) {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins or super-admins may create invites');
+  }
+
+  const email = (data && data.email) ? String(data.email).trim() : '';
+  if (!email || !email.includes('@')) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid email is required');
+  }
+
+  // Generate a random 6-character alphanumeric code
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const rnd = () => Math.floor(Math.random() * chars.length);
+  const suffix = Array.from({ length: 6 }).map(() => chars[rnd()]).join('');
+  const code = `FAC-${suffix}`;
+
+  // Persist invite
+  const inviteDoc = {
+    code: code,
+    email: email,
+    role: 'faculty',
+    isUsed: false,
+    createdBy: callerUid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  await db.collection('invites').add(inviteDoc);
+
+  // Send email using SendGrid if configured
+  const sendgridKey = functions.config().sendgrid && functions.config().sendgrid.key;
+  const sender = functions.config().sendgrid && functions.config().sendgrid.sender;
+  if (!sgMail || !sendgridKey || !sender) {
+    // If email sending is not configured, return success but note emails not sent
+    return { success: true, emailed: false, code };
+  }
+
+  try {
+    sgMail.setApiKey(sendgridKey);
+    const msg = {
+      to: email,
+      from: sender,
+      subject: 'Your Faculty Invite Code',
+      text: `Your faculty invite code is: ${code}`,
+      html: `<p>Your faculty invite code is: <strong>${code}</strong></p><p>Use this code to register as faculty.</p>`,
+    };
+    await sgMail.send(msg);
+    return { success: true, emailed: true, code };
+  } catch (e) {
+    // Log and return success with emailed=false
+    console.error('Failed to send invite email', e);
+    return { success: true, emailed: false, code };
+  }
+});
+
+/**
+ * Callable function to verify an invite code.
+ * This avoids exposing the `invites` collection to unauthenticated clients
+ * and prevents client-side permission-denied errors when verifying codes.
+ * Payload: { code: string }
+ */
+exports.verifyFacultyInvite = functions.https.onCall(async (data, context) => {
+  const code = data && data.code ? String(data.code).trim() : '';
+  if (!code) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invite code is required');
+  }
+
+  const db = admin.firestore();
+  const snap = await db.collection('invites').where('code', '==', code).limit(1).get();
+  if (snap.empty) {
+    throw new functions.https.HttpsError('not-found', 'Invite code not found');
+  }
+
+  const doc = snap.docs[0];
+  const dataObj = doc.data();
+  if (dataObj.isUsed === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Invite code already used');
+  }
+
+  // Return only the safe fields needed by the client
+  const safe = {
+    id: doc.id,
+    code: dataObj.code,
+    email: dataObj.email || null,
+    role: dataObj.role || null,
+    uniId: dataObj.uniId || null,
+    facultyName: dataObj.facultyName || null,
+    department: dataObj.department || null,
+    createdAt: dataObj.createdAt || null,
+  };
+
+  return { success: true, invite: safe };
 });

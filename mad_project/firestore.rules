@@ -46,49 +46,57 @@ service cloud.firestore {
         match /{subCollection=**} {
           allow read, write: if request.auth != null && (
             request.auth.uid == userDoc ||
-            isUniAdmin(request.auth.uid, uni) ||
-            isSuperAdmin(request.auth.uid)
-          );
-        }
-      }
+            rules_version = '2';
+            service cloud.firestore {
+              match /databases/{database}/documents {
+                // Helper functions
+                function isSignedIn() { return request.auth != null; }
+                function userRole(uid) {
+                  return get(/databases/$(database)/documents/users/$(uid)).data.role;
+                }
+                function isSuperAdmin(uid) {
+                  return exists(/databases/$(database)/documents/super_admins/$(uid));
+                }
+                function isAdmin(uid) {
+                  return userRole(uid) == 'admin' || isSuperAdmin(uid);
+                }
 
-      match /{subCollection=**} {
-        allow read: if true;
-        allow write: if request.auth != null && (isSuperAdmin(request.auth.uid) || isUniAdmin(request.auth.uid, uni));
-      }
-    }
+                // Invites: only admins/super-admins may create/update/delete invites.
+                // Invite recipients may read invites addressed to their email.
+                match /invites/{inviteId} {
+                  allow create, update, delete: if isSignedIn() && isAdmin(request.auth.uid);
+                  allow read: if isSignedIn() && (
+                    isAdmin(request.auth.uid) ||
+                    (resource.data.email != null && resource.data.email == request.auth.token.email)
+                  );
+                }
 
-    // ==========================================================
-    // 5. POSTS (Lost & Found Root)
-    // ==========================================================
-    match /posts/{postId} {
-      allow read: if true;
-      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && (
-        resource.data.uid == request.auth.uid ||
-        isSuperAdmin(request.auth.uid)
-      );
-    }
+                // Appointments: creators can create with uid == caller; faculty and admins
+                // can update appointment status. Reads are allowed for convenience.
+                match /appointments/{appointmentId} {
+                  allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+                  allow read: if true;
+                  allow update, delete: if isSignedIn() && (
+                    resource.data.facultyId == request.auth.uid ||
+                    resource.data.uid == request.auth.uid ||
+                    isAdmin(request.auth.uid)
+                  );
+                }
 
-    match /super_admins/{uid} {
-      allow read, write: if request.auth != null && isSuperAdmin(request.auth.uid);
-    }
+                // Users: users can read/write their own documents; admins can manage any user.
+                match /users/{userId} {
+                  allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid));
+                }
 
-    // Jobs collection stored at root
-    match /jobs/{jobId} {
-      // Anyone can read active jobs
-      allow read: if true;
+                // Super-admin list: only super-admins may read/write
+                match /super_admins/{uid} {
+                  allow read, write: if isSignedIn() && isSuperAdmin(request.auth.uid);
+                }
 
-      // Create: recruiters or super-admins (recruiterId must match caller)
-      allow create: if request.auth != null && (
-        request.auth.uid == request.resource.data.recruiterId ||
-        exists(/databases/$(database)/documents/super_admins/$(request.auth.uid)) ||
-        // university admin for job's target university
-        rules_version = '2';
-        service cloud.firestore {
-          match /databases/{database}/documents {
-            // TESTING ONLY: allow any authenticated user full read/write access.
-            // This is insecure and must be tightened before production.
-            allow read, write: if request.auth != null;
-          }
-        }
+                // Default: allow reads but restrict writes to admins only. Adjust as needed.
+                match /{document=**} {
+                  allow read: if true;
+                  allow write: if isSignedIn() && isAdmin(request.auth.uid);
+                }
+              }
+            }

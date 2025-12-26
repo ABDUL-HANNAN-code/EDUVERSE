@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'shared.dart';
 
+// --- FIXED IMPORT PATH HERE ---
+import 'timetable/FACULTY/faculty_invite_screen.dart';
+
 // ==========================================
 // AUTH SERVICE (Logic)
 // ==========================================
@@ -12,7 +15,6 @@ import 'shared.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Singleton
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
 
@@ -29,6 +31,33 @@ class AuthService {
           header: "Login Failed",
           content: e.message ?? "Error",
           bgColor: Colors.red.shade100);
+      rethrow;
+    }
+  }
+
+  // --- ADMIN: GENERATE FACULTY INVITE CODE ---
+  Future<String> generateFacultyInvite({
+    required String facultyEmail, 
+    required String uniId,
+    String? deptId
+  }) async {
+    try {
+      // Generate a random code: FAC + last 5 digits of timestamp
+      String code = "FAC-${DateTime.now().millisecondsSinceEpoch.toString().substring(8, 13)}";
+      
+      await FirebaseFirestore.instance.collection('invites').add({
+        'code': code,
+        'email': facultyEmail,
+        'uniId': uniId,
+        'departmentId': deptId ?? '',
+        'isUsed': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': _auth.currentUser?.uid, // Added for auditing
+      });
+      
+      return code;
+    } catch (e) {
+      debugPrint("Error creating invite: $e");
       rethrow;
     }
   }
@@ -63,9 +92,7 @@ class AuthService {
       }
       return _auth.currentUser;
     } on FirebaseAuthException catch (e, s) {
-      // Log detailed FirebaseAuthException for debugging (shows code + message)
-      debugPrint(
-          'FirebaseAuthException in createUser: code=${e.code} message=${e.message}');
+      debugPrint('FirebaseAuthException in createUser: code=${e.code} message=${e.message}');
       debugPrint('Stack: $s');
       MySnackBar().mySnackBar(
           header: "Registration Failed",
@@ -73,7 +100,6 @@ class AuthService {
           bgColor: Colors.red.shade100);
       rethrow;
     } catch (e, s) {
-      // Catch any other unexpected errors and log them
       debugPrint('Unexpected error in createUser: $e');
       debugPrint('Stack: $s');
       MySnackBar().mySnackBar(
@@ -117,7 +143,6 @@ class AuthService {
     }
   }
 
-  /// Reload current user and return whether their email is verified.
   Future<bool> checkEmailVerified() async {
     final user = _auth.currentUser;
     if (user == null) return false;
@@ -150,7 +175,6 @@ class AuthService {
     return "";
   }
 
-  // --- Signup helpers ---
   Future<List<Map<String, dynamic>>> fetchUniversities() async {
     var snap =
         await FirebaseFirestore.instance.collection('universities').get();
@@ -160,7 +184,6 @@ class AuthService {
         .toList();
   }
 
-  /// Fetch full university documents (including domains and flags)
   Future<List<Map<String, dynamic>>> fetchUniversitiesDetailed() async {
     var snap =
         await FirebaseFirestore.instance.collection('universities').get();
@@ -175,13 +198,10 @@ class AuthService {
     }).toList();
   }
 
-  /// Try to find a university that matches the email domain.
-  /// Returns the university id or null.
   Future<Map<String, dynamic>?> getUniversityByEmail(String email) async {
     if (email.isEmpty || !email.contains('@')) return null;
     final domain = email.split('@').last.toLowerCase();
     final unis = await fetchUniversitiesDetailed();
-    // Try exact domain match first, then suffix match
     for (final u in unis) {
       final domains = (u['domains'] as List<String>?) ?? [];
       if (domains.map((s) => s.toLowerCase()).contains(domain)) return u;
@@ -196,8 +216,6 @@ class AuthService {
     return null;
   }
 
-  /// Find a university that contains the given uniUniqueId in its allowed_ids.
-  /// Returns the uni document (id + name + fields) or null.
   Future<Map<String, dynamic>?> getUniversityByUniqueId(
       String uniUniqueId) async {
     if (uniUniqueId.isEmpty) return null;
@@ -242,7 +260,6 @@ class AuthService {
         .toList();
   }
 
-  /// Verify uni unique id exists in universities/{uniId}/allowed_ids/{uniUniqueId}
   Future<bool> verifyUniUniqueId(String uniId, String uniUniqueId) async {
     if (uniId.isEmpty || uniUniqueId.isEmpty) return false;
     var doc = await FirebaseFirestore.instance
@@ -281,13 +298,16 @@ class _LoginViewState extends State<LoginView> {
               SvgPicture.asset("assets/images/login.svg", height: 200),
               const BigText(text: "Login", color: AppColors.primaryBlack),
               const SizedBox(height: 20),
+              
               TextFormField(
                   controller: _email,
                   decoration: MyDecoration().getDecoration(
                       icon: Icons.email,
                       label: const Text("Email"),
                       hintText: "Enter Email")),
+              
               const SizedBox(height: 10),
+              
               TextFormField(
                   controller: _password,
                   obscureText: true,
@@ -295,55 +315,75 @@ class _LoginViewState extends State<LoginView> {
                       icon: Icons.lock,
                       label: const Text("Password"),
                       hintText: "Enter Password")),
+              
               const SizedBox(height: 20),
+              
               BlueButton(
                 text: "Login",
                 onPressed: () async {
                   try {
+                    // 1. Standard Firebase Auth Login
                     User? user = await AuthService()
                         .logIn(email: _email.text.trim(), password: _password.text);
+                    
                     if (user != null) {
-                      // If email not verified, send to verify view
-                      if (!user.emailVerified) {
-                        Get.to(() => const VerifyEmailView());
-                        return;
-                      }
-
-                      // Fetch role from Firestore and route accordingly
-                      try {
-                        final doc = await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(user.uid)
-                            .get();
-                        if (doc.exists) {
-                          final role = (doc.data()?['role'] ?? '').toString();
-                          if (role == 'recruiter') {
-                            Get.offAllNamed('/recruiter-dashboard');
-                            return;
-                          }
-                          if (role == 'admin') {
-                            Get.offAllNamed('/admin');
-                            return;
-                          }
+                      // 2. CHECK DATABASE FOR ROLE & REDIRECT
+                      final doc = await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .get();
+                      
+                      if (doc.exists) {
+                        final role = (doc.data()?['role'] ?? '').toString();
+                        
+                        if (role == 'faculty') {
+                          Get.offAllNamed('/faculty-dashboard'); 
+                          return;
                         }
-                      } catch (e) {
-                        // ignore firestore lookup errors and fall back to dashboard
+                        if (role == 'recruiter') {
+                          Get.offAllNamed('/recruiter-dashboard');
+                          return;
+                        }
+                        if (role == 'admin') {
+                          Get.offAllNamed('/admin');
+                          return;
+                        }
                       }
-
-                      // Default route for regular users
-                      Get.offAllNamed('/dashboard');
+                      
+                      // 3. Default -> Student
+                      if (!user.emailVerified) {
+                          Get.to(() => const VerifyEmailView());
+                      } else {
+                          Get.offAllNamed('/dashboard');
+                      }
                     }
                   } catch (e) {
-                    // Handled in service
+                    // Error is handled in AuthService (shows snackbar)
                   }
                 },
               ),
+              
               const SizedBox(height: 20),
+              
               InkWell(
                 onTap: () => Get.to(() => const RegisterView()),
-                child: const Text("Don't have an account? Sign Up",
+                child: const Text("Don't have an account? Student Sign Up",
                     style: TextStyle(color: AppColors.mainColor)),
-              )
+              ),
+              const SizedBox(height: 12),
+              // FACULTY INVITE LINK
+              InkWell(
+                onTap: () => Get.to(() => const FacultyInviteScreen()),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.mainColor),
+                    borderRadius: BorderRadius.circular(8)
+                  ),
+                  child: const Text("Have a Faculty Invite Code?",
+                      style: TextStyle(color: AppColors.mainColor, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ],
           ),
         ),
@@ -358,7 +398,6 @@ class RegisterView extends StatefulWidget {
   State<RegisterView> createState() => _RegisterViewState();
 }
 
-/// Step 1: Collect email & password only. "Next" pushes to step 2.
 class _RegisterViewState extends State<RegisterView> {
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -401,7 +440,6 @@ class _RegisterViewState extends State<RegisterView> {
                         bgColor: Colors.orange.shade100);
                     return;
                   }
-                  // Navigate to step 2 and pass email+password
                   Get.to(() => RegisterStep2View(email: email, password: pass));
                 },
               )
@@ -413,8 +451,6 @@ class _RegisterViewState extends State<RegisterView> {
   }
 }
 
-/// Step 2: Auto-detect university from the provided email and allow user to select
-/// department, section and shift, then complete signup.
 class RegisterStep2View extends StatefulWidget {
   final String email;
   final String password;
@@ -517,7 +553,6 @@ class _RegisterStep2State extends State<RegisterStep2View> {
                     label: const Text('Full Name'),
                     hintText: 'Your name')),
             const SizedBox(height: 12),
-            // University (auto-detected but editable)
             DropdownButtonFormField<String>(
               value: _selectedUni,
               decoration: MyDecoration().getDecoration(
@@ -610,7 +645,6 @@ class _RegisterStep2State extends State<RegisterStep2View> {
                   })
             ]),
             const SizedBox(height: 10),
-            // Semester selection (optional)
             Row(children: [
               const Text('Semester:'),
               const SizedBox(width: 12),
@@ -636,7 +670,6 @@ class _RegisterStep2State extends State<RegisterStep2View> {
               text: 'Sign Up',
               onPressed: () async {
                 try {
-                  // Validate required fields and show popup if any missing
                   final missing = <String>[];
                   if (_name.text.trim().isEmpty) missing.add('Full name');
                   if (_selectedUni == null) missing.add('University');
@@ -666,9 +699,6 @@ class _RegisterStep2State extends State<RegisterStep2View> {
                   }
 
                   final uniUniqueId = _uniUniqueId.text.trim();
-
-                  // Determine university: prefer the user-selected university, otherwise
-                  // try to find by the provided unique id.
                   Map<String, dynamic>? uni;
                   if (_selectedUni != null) {
                     final all = await AuthService().fetchUniversitiesDetailed();
@@ -692,23 +722,14 @@ class _RegisterStep2State extends State<RegisterStep2View> {
                   }
 
                   final uniId = uni['id'] as String;
-
-                  // validate email domain belongs to the same university
                   final uniFromEmail =
                       await AuthService().getUniversityByEmail(widget.email);
                   if (uniFromEmail == null ||
                       (uniFromEmail['id'] as String) != uniId) {
-                    final domains = (uni['domains'] as List<dynamic>?)
-                            ?.map((d) => d.toString())
-                            .toList() ??
-                        [];
-                    final domText = domains.isEmpty
-                        ? 'no domains configured'
-                        : domains.join(', ');
                     MySnackBar().mySnackBar(
                         header: 'Email Domain Mismatch',
                         content:
-                            'Your email domain does not match the selected university (${uni['name']}). Expected: $domText. Use your university email or select the correct university.',
+                            'Email domain mismatch. Use your university email.',
                         bgColor: Colors.red.shade100);
                     return;
                   }
@@ -722,7 +743,7 @@ class _RegisterStep2State extends State<RegisterStep2View> {
                       MySnackBar().mySnackBar(
                           header: 'Not Allowed',
                           content:
-                              'This university does not recognize your student id. Contact admin.',
+                              'This university does not recognize your student id.',
                           bgColor: Colors.red.shade100);
                       return;
                     }
@@ -778,10 +799,6 @@ class VerifyEmailView extends StatelessWidget {
               onPressed: () async {
                 final verified = await AuthService().checkEmailVerified();
                 if (verified) {
-                  MySnackBar().mySnackBar(
-                      header: "Verified",
-                      content: "Email verified — redirecting...",
-                      bgColor: Colors.green.shade100);
                   Get.offAllNamed('/dashboard');
                 } else {
                   MySnackBar().mySnackBar(

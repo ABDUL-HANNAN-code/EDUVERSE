@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart'; // Added for Clipboard
 import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
@@ -9,7 +10,7 @@ import 'recruiter_requests_admin.dart';
 import 'admin_notifications.dart';
 import '../lost_and_found_admin.dart';
 import '../complaints/views/admin_complaint_list.dart';
-// Poster manager removed from admin dashboard per UX request
+import '../auth.dart'; // IMPORTED AUTH SERVICE
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -64,13 +65,10 @@ class _AdminDashboardState extends State<AdminDashboard>
     _loadAdminProfile();
   }
 
-  // Wrap Firestore snapshots with error handling to avoid web SDK assertion
-  // bubbling up and crashing the app. Errors are logged and swallowed so UI
-  // can display a friendly message instead of causing unhandled exceptions.
+  // Wrap Firestore snapshots with error handling
   Stream<QuerySnapshot> _safeCollectionStream(CollectionReference col) {
     try {
       return col.snapshots().handleError((e, st) {
-        // Log for diagnostics; do not rethrow to avoid breaking StreamBuilder
         debugPrint('Firestore stream error: $e');
       }, test: (_) => true);
     } catch (e) {
@@ -99,24 +97,28 @@ class _AdminDashboardState extends State<AdminDashboard>
       isSuperAdmin = (role == 'super_admin');
       adminScope = data['adminScope'] as Map<String, dynamic>?;
 
-      if (role == 'admin' && adminScope != null) {
-        if (adminScope!['deptId'] != null) {
+      if (role == 'admin') {
+        // Check scope first
+        if (adminScope != null && adminScope!['deptId'] != null) {
           isDepartmentAdmin = true;
           isUniversityAdmin = false;
         } else {
+          // If no specific dept scope, assume University Admin
           isUniversityAdmin = true;
           isDepartmentAdmin = false;
         }
       }
 
+      // LOAD CONTEXT (uniId)
       if (isSuperAdmin) {
         selectedUni = null;
-      } else if (adminScope != null) {
+      } else if (adminScope != null && adminScope!['uniId'] != null) {
         selectedUni = adminScope!['uniId'];
         if (adminScope!['deptId'] != null) {
           selectedDept = adminScope!['deptId'];
         }
       } else {
+        // Fallback to direct field on user doc
         selectedUni = data['uniId'];
       }
 
@@ -127,7 +129,6 @@ class _AdminDashboardState extends State<AdminDashboard>
         ((isSuperAdmin || isUniversityAdmin || isDepartmentAdmin) ? 1 : 0) +
         ((isSuperAdmin || isUniversityAdmin) ? 2 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
-    // Ensure UI updates (FAB visibility) when the selected tab changes
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -166,6 +167,108 @@ class _AdminDashboardState extends State<AdminDashboard>
     return parts.join(" > ");
   }
 
+  // ==========================================
+  // FIXED GENERATE INVITE DIALOG
+  // ==========================================
+  void _showGenerateInviteDialog() {
+    // 1. Validation: Ensure we know which university this admin belongs to
+    if (selectedUni == null) {
+      Get.snackbar(
+        "Error", 
+        "University ID not found. Please select a university context.",
+        backgroundColor: Colors.red.shade100
+      );
+      return;
+    }
+
+    final emailCtrl = TextEditingController();
+
+    Get.defaultDialog(
+      title: "Generate Faculty Invite",
+      content: Column(
+        children: [
+          const Text("Enter the professor's email to lock this code."),
+          const SizedBox(height: 10),
+          TextField(
+            controller: emailCtrl,
+            decoration: const InputDecoration(
+              labelText: "Professor Email",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.email),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "Linking to Uni ID: $selectedUni", 
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+      textConfirm: "Generate",
+      textCancel: "Cancel",
+      confirmTextColor: Colors.white,
+      onConfirm: () async {
+        final email = emailCtrl.text.trim();
+        if (email.isEmpty || !email.contains('@')) {
+          Get.snackbar("Error", "Invalid Email", backgroundColor: Colors.orange.shade100);
+          return;
+        }
+
+        try {
+          // 2. CALL AUTH SERVICE DIRECTLY (No Cloud Functions)
+          // This generates the code and writes to Firestore 'invites' collection
+          final String code = await AuthService().generateFacultyInvite(
+            facultyEmail: email,
+            uniId: selectedUni!, 
+            deptId: selectedDept, // Optional: link to department if known
+          );
+
+          Get.back(); // Close input dialog
+
+          // 3. Show Success Dialog with Copy option
+          Get.defaultDialog(
+            title: "Invite Created",
+            content: Column(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 50),
+                const SizedBox(height: 10),
+                const Text("Share this code with the professor:"),
+                const SizedBox(height: 10),
+                SelectableText(
+                  code,
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue, letterSpacing: 2),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: code));
+                    Get.back();
+                    Get.snackbar("Copied", "Code copied to clipboard", backgroundColor: Colors.green.shade100);
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: const Text("Copy Code"),
+                )
+              ],
+            ),
+            textCancel: null, // removing default cancel button
+          );
+
+        } catch (e) {
+          Get.back();
+          Get.snackbar(
+            'Error', 
+            'Failed to generate invite: $e', 
+            backgroundColor: Colors.red.shade100,
+            duration: const Duration(seconds: 5)
+          );
+        }
+      },
+    );
+  }
+
+  // ==========================================
+  // MAIN BUILD
+  // ==========================================
   @override
   Widget build(BuildContext context) {
     if (isLoadingProfile) {
@@ -174,6 +277,18 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return Scaffold(
       appBar: AppBar(
+        leading: isSuperAdmin
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Get.offAllNamed('/dashboard');
+                  }
+                },
+              ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -192,6 +307,13 @@ class _AdminDashboardState extends State<AdminDashboard>
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: _showWizardMenu,
+            ),
+          // THIS IS THE BUTTON YOU CLICKED (Now linked to fixed function)
+          if (!isSuperAdmin && (isUniversityAdmin || isDepartmentAdmin))
+            IconButton(
+              icon: const Icon(Icons.person_add_alt_1),
+              tooltip: 'Generate Faculty Invite',
+              onPressed: _showGenerateInviteDialog,
             ),
         ],
         bottom: TabBar(
@@ -307,22 +429,14 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
             ),
           ),
-          // University Selector
           if (isSuperAdmin)
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
               child: DropdownButtonFormField<String?>(
                 value: selectedUni,
                 decoration: const InputDecoration(
                   labelText: "University",
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
                 ),
                 items: [
                   const DropdownMenuItem<String?>(
@@ -343,9 +457,6 @@ class _AdminDashboardState extends State<AdminDashboard>
                         ? universities.firstWhere((e) => e['id'] == val)['name']
                         : null;
                     selectedDept = null;
-                    selectedDeptName = null;
-                    selectedSection = null;
-                    selectedSectionName = null;
                     departments = [];
                     sections = [];
                   });
@@ -353,6 +464,25 @@ class _AdminDashboardState extends State<AdminDashboard>
                 },
               ),
             ),
+          
+          if (!isSuperAdmin && selectedUni != null)
+             ListTile(
+              leading: const Icon(Icons.school, color: Colors.grey),
+              title: const Text("University ID"),
+              subtitle: Text(selectedUni!), // Confirms ID is loaded
+            ),
+
+          if (isSuperAdmin || isUniversityAdmin) ...[
+            ListTile(
+              leading: const Icon(Icons.notifications),
+              title: const Text('Notifications'),
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AdminNotifications(adminUniId: isUniversityAdmin ? selectedUni : null)));
+              },
+            ),
+          ],
+          
           // Semester selector
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
@@ -382,12 +512,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               },
             ),
           ),
-          if (!isSuperAdmin && selectedUniName != null)
-            ListTile(
-              leading: const Icon(Icons.school),
-              title: Text(selectedUniName!),
-              subtitle: const Text('Your University (locked)'),
-            ),
+          
           // Department Selector
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
@@ -495,35 +620,13 @@ class _AdminDashboardState extends State<AdminDashboard>
                   setState(() => selectedShift = val ?? 'morning'),
             ),
           ),
-          // Manage Marketplaces - removed from drawer; accessible via Dashboard tab
-          // Recruiter Requests (visible to admins)
-          if (isSuperAdmin || isUniversityAdmin) ...[
-            ListTile(
-              leading: const Icon(Icons.notifications),
-              title: const Text('Notifications'),
-              subtitle: const Text('View admin notifications'),
-              onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => AdminNotifications(adminUniId: isUniversityAdmin ? selectedUni : null)));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.work_outline),
-              title: const Text('Recruiter Requests'),
-              subtitle: const Text('Approve or review recruiter job requests'),
-              onTap: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => RecruiterRequestsAdmin(adminUniId: isUniversityAdmin ? selectedUni : null)));
-              },
-            ),
-          ],
         ],
       ),
     );
   }
 
   // ==========================================
-  // GRID TIMETABLE (ORIGINAL - KEEPING THE GOOD STUFF!)
+  // GRID TIMETABLE
   // ==========================================
   Widget _buildGridTimetable() {
     if (selectedUni == null) {
@@ -1878,6 +1981,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                 onTap: () {
                   Get.back();
                   _startSectionWizard();
+                },
+              ),
+            if (selectedUni != null)
+              ListTile(
+                leading: const Icon(Icons.vpn_key, color: Colors.orange),
+                title: const Text('Generate Faculty Invite'),
+                subtitle: const Text('Create invite code for professors'),
+                onTap: () {
+                  Get.back();
+                  _showGenerateInviteDialog(); 
                 },
               ),
           ],

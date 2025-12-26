@@ -1,3 +1,42 @@
+Functions helper notes
+
+This functions folder includes two callable functions:
+- `setUserRole` (existing): used by super-admins to set roles
+- `createFacultyInvite` (added): callable by admins/super-admins to generate an invite, persist it to `invites` collection, and send an email via SendGrid
+
+Environment setup
+1. Install dependencies:
+
+```bash
+cd functions
+npm install
+```
+
+2. Configure SendGrid (optional, for real email delivery):
+
+```bash
+firebase functions:config:set sendgrid.key="<SENDGRID_API_KEY>" sendgrid.sender="no-reply@yourdomain.com"
+```
+
+3. Deploy functions:
+
+```bash
+cd ..
+firebase deploy --only functions
+```
+
+Testing locally (emulator)
+1. Start emulators:
+
+```bash
+firebase emulators:start --only auth,firestore,functions
+```
+
+2. Call the function from client code using `FirebaseFunctions.instance.httpsCallable('createFacultyInvite')` (Flutter) or via `firebase.functions().httpsCallable('createFacultyInvite')` (web/Node).
+
+Notes
+- If SendGrid is not configured, the function will store the invite in Firestore and return `{emailed:false}`.
+- The function returns the generated code to the caller when invoked by an admin. If you prefer not to return the code to the client, modify the function to return only `{success:true}`.
 Firebase Cloud Function: setUserRole
 
 What it does

@@ -418,10 +418,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
           route: '/student-placement',
         ),
         ModuleItem(
-          title: 'Group Hub',
-          description: 'Collaborate with peers',
-          icon: Icons.groups,
+          title: 'Faculty Connect',
+          description: 'Connect with your university faculty',
+          icon: Icons.school,
           gradientColors: [Color(0xFF16A085), Color(0xFF1ABC9C)],
+          route: '/faculty-connect',
         ),
         ModuleItem(
           title: 'Complaint System',

@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
+
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
 import 'complaints/views/create_complaint_screen.dart';
@@ -24,35 +25,31 @@ import 'ai_study_planner/ai_study_planner.dart';
 // Placement module (student & recruiter)
 import 'timetable/placements/student_placement_screen.dart';
 import 'timetable/placements/recruiter_admin_panel.dart';
-// Recruiter admin auth removed - use `auth.dart`'s `LoginView`
+
+// --- FIXED IMPORT PATH HERE ---
+import 'timetable/FACULTY/faculty_dashboard.dart';
+// Faculty Connect (student-facing module)
+import 'timetable/FACULTY/student_connect.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with your project credentials (guarded)
   try {
-    // Avoid duplicate initialization when an app already exists (can happen
-    // when plugins or platform code initialize Firebase automatically).
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
     }
   } catch (e, s) {
-    // If the error is the common "already exists" duplicate-app error,
-    // ignore it and continue — Firebase is already initialized on the
-    // native side in some environments.
     final msg = e.toString();
     if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
       // swallow duplicate initialization error
     } else {
-      // If Firebase fails to initialize, surface the error in a simple UI
-      // so we can see the exception on device instead of a black screen.
       runApp(ErrorReportApp(exception: e, stack: s));
       return;
     }
   }
-  // Workaround for intermittent web Firestore watch errors: disable persistence
+  
   try {
     FirebaseFirestore.instance.settings =
         const Settings(persistenceEnabled: false);
@@ -60,7 +57,6 @@ void main() async {
     // ignore errors applying settings in non-web platforms
   }
 
-  // Print recruiter admin credentials (from environment or defaults)
   try {
     final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
     final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
@@ -70,7 +66,7 @@ void main() async {
   } catch (_) {
     // Platform.environment may not be available on all targets; ignore.
   }
-  // Global error handling: show exceptions in UI instead of white screen
+  
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
   };
@@ -100,7 +96,6 @@ void main() async {
     );
   };
 
-  // Run the app normally so Widgets binding and runApp share the same zone.
   runApp(const UniversityApp());
 }
 
@@ -149,13 +144,10 @@ class UniversityApp extends StatelessWidget {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Eduverse',
-          theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Poppins'),
+          theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Inter'),
 
-          // Authentication gate decides start screen
           home: const AuthGate(),
-          initialRoute: null, // Let AuthGate decide
 
-          // Define Names for modules for easy navigation
           getPages: [
             // Auth Routes
             GetPage(name: '/login', page: () => const LoginView()),
@@ -164,17 +156,17 @@ class UniversityApp extends StatelessWidget {
             GetPage(
                 name: '/dashboard',
                 page: () =>
-                    const HomeDashboard()), // Home Dashboard - main screen after login
+                    const HomeDashboard()), 
             GetPage(name: '/admin', page: () => const AdminDashboard()),
             
             // Feature Module Routes
             GetPage(
                 name: '/lost-and-found',
                 page: () =>
-                    const LostAndFoundLandingPage()), // Lost & Found module
+                    const LostAndFoundLandingPage()), 
             GetPage(
                 name: '/timetable',
-                page: () => const TimetableScreen()), // Timetable module
+                page: () => const TimetableScreen()), 
             GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
             
             // Complaints module
@@ -188,6 +180,17 @@ class UniversityApp extends StatelessWidget {
             // Placement module (student & recruiter)
             GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
             GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
+
+            // === FACULTY MODULE ROUTE ===
+            GetPage(
+              name: '/faculty-dashboard', 
+              page: () => const FacultyDashboardScreen()
+            ),
+            // Student-facing Faculty Connect (directory + booking)
+            GetPage(
+              name: '/faculty-connect',
+              page: () => const MainNavigationScreen(),
+            ),
           ],
         );
       },
@@ -195,10 +198,6 @@ class UniversityApp extends StatelessWidget {
   }
 }
 
-/// AuthGate: Smart routing based on authentication state
-/// - Not logged in -> Show Welcome Screen (Role Selection)
-/// - Logged in but email not verified -> Show Email Verification
-/// - Logged in and verified -> Show Dashboard
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
   
@@ -207,13 +206,25 @@ class AuthGate extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     
     if (user != null) {
-      // User is logged in
-      return user.emailVerified
-          ? const HomeDashboard() // Verified -> Dashboard
-          : const VerifyEmailView(); // Not verified -> Verify email
+      return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+        builder: (context, snapshot) {
+          if(!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          final role = userData?['role'] ?? 'student';
+
+          if (role == 'faculty') return const FacultyDashboardScreen();
+          if (role == 'recruiter') return const RecruiterAdminPanel();
+          if (role == 'admin') return const AdminDashboard();
+          
+          return user.emailVerified 
+              ? const HomeDashboard() 
+              : const VerifyEmailView();
+        }
+      );
     }
     
-    // No user logged in -> Show classic Login screen
     return const LoginView();
   }
 }
