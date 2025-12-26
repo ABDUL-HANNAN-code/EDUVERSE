@@ -16,7 +16,9 @@ class AdminComplaintList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // If admin supplies a uniId from the dashboard, ensure controller uses it
-    if (adminViewUniId != null && adminViewUniId!.isNotEmpty && controller.selectedUniId.value != adminViewUniId) {
+    if (adminViewUniId != null &&
+        adminViewUniId!.isNotEmpty &&
+        controller.selectedUniId.value != adminViewUniId) {
       controller.setSelectedUniversity(adminViewUniId!);
     }
     return DefaultTabController(
@@ -73,26 +75,37 @@ class AdminComplaintList extends StatelessWidget {
             Obx(() {
               if (controller.isSuperAdmin.value) {
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     children: [
-                      const Text('University:', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const Text('University:',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Obx(() {
                           final items = controller.universities;
                           return DropdownButtonFormField<String>(
-                            value: controller.selectedUniId.value.isEmpty ? '' : controller.selectedUniId.value,
+                            value: controller.selectedUniId.value.isEmpty
+                                ? ''
+                                : controller.selectedUniId.value,
                             items: [
-                              const DropdownMenuItem<String>(value: '', child: Text('All Universities')),
-                              ...items.map((m) => DropdownMenuItem<String>(value: m['id'] ?? '', child: Text(m['name'] ?? m['id'] ?? ''))).toList(),
+                              const DropdownMenuItem<String>(
+                                  value: '', child: Text('All Universities')),
+                              ...items
+                                  .map((m) => DropdownMenuItem<String>(
+                                      value: m['id'] ?? '',
+                                      child: Text(m['name'] ?? m['id'] ?? '')))
+                                  .toList(),
                             ],
                             onChanged: (v) {
                               controller.setSelectedUniversity(v ?? '');
                             },
                             decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                           );
                         }),
@@ -192,19 +205,23 @@ class AdminComplaintList extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                                 Obx(() {
-                                  final profile = controller.studentProfiles[complaint.studentId];
-                                  final studentName = profile?['name'];
-                                  final uniName = controller.uniNames[complaint.uniId];
+                                    final profile = controller
+                                      .studentProfiles[complaint.studentId];
+                                    final studentName = profile?['name'] ?? complaint.studentName;
+                                    final uniName = controller.uniNames[complaint.uniId] ?? complaint.uniName;
                                   return Row(
                                     children: [
                                       Flexible(
                                         child: Text(
-                                          studentName != null && studentName.isNotEmpty
+                                          studentName != null &&
+                                                  studentName.isNotEmpty
                                               ? 'By: $studentName'
                                               : (complaint.isAnonymous
                                                   ? 'By: Anonymous'
                                                   : 'By: ${complaint.studentId}'),
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[700]),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                         ),
@@ -213,38 +230,55 @@ class AdminComplaintList extends StatelessWidget {
                                       if (complaint.uniId.isNotEmpty)
                                         Flexible(
                                           child: Text(
-                                            uniName != null && uniName.isNotEmpty
+                                            uniName != null &&
+                                                    uniName.isNotEmpty
                                                 ? 'University: $uniName'
                                                 : 'University: ${complaint.uniId}',
-                                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                            style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[700]),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                     ],
                                   );
-                                  }),
-                                  const SizedBox(height: 6),
-                                  Obx(() {
-                                    final profile = controller.studentProfiles[complaint.studentId];
-                                    final deptName = profile?['deptName'];
-                                    final sectionName = profile?['sectionName'];
-                                    final semester = profile?['semester'];
-                                    final shift = profile?['shift'];
-                                    if ((deptName ?? '').isEmpty && (sectionName ?? '').isEmpty && (semester ?? '').isEmpty && (shift ?? '').isEmpty) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        if (deptName != null && deptName.isNotEmpty) _smallInfoChip(Icons.business, deptName),
-                                        if (sectionName != null && sectionName.isNotEmpty) _smallInfoChip(Icons.group, sectionName),
-                                        if (semester != null && semester.isNotEmpty) _smallInfoChip(Icons.book, 'Sem $semester'),
-                                        if (shift != null && shift.isNotEmpty) _smallInfoChip(Icons.wb_sunny, shift),
-                                      ],
-                                    );
-                                  }),
+                                }),
+                                const SizedBox(height: 6),
+                                Obx(() {
+                                    final profile = controller
+                                      .studentProfiles[complaint.studentId];
+                                    final deptName = profile?['deptName'] ?? complaint.deptName;
+                                    final sectionName = profile?['sectionName'] ?? complaint.sectionName;
+                                    final semester = profile?['semester'] ?? complaint.semester;
+                                    final shift = profile?['shift'] ?? complaint.shift;
+                                  if ((deptName ?? '').isEmpty &&
+                                      (sectionName ?? '').isEmpty &&
+                                      (semester ?? '').isEmpty &&
+                                      (shift ?? '').isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: [
+                                      if (deptName != null &&
+                                          deptName.isNotEmpty)
+                                        _smallInfoChip(
+                                            Icons.business, deptName),
+                                      if (sectionName != null &&
+                                          sectionName.isNotEmpty)
+                                        _smallInfoChip(
+                                            Icons.group, sectionName),
+                                      if (semester != null &&
+                                          semester.isNotEmpty)
+                                        _smallInfoChip(
+                                            Icons.book, 'Sem $semester'),
+                                      if (shift != null && shift.isNotEmpty)
+                                        _smallInfoChip(Icons.wb_sunny, shift),
+                                    ],
+                                  );
+                                }),
                               ],
                             ),
                           ),

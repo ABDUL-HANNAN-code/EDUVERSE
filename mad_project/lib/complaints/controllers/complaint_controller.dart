@@ -215,4 +215,30 @@ class ComplaintController extends GetxController {
   void toggleAnonymous(bool value) {
     isAnonymous.value = value;
   }
+
+  Future<void> deleteComplaint(String complaintId) async {
+    try {
+      isLoading.value = true;
+      await _service.deleteComplaint(complaintId);
+      isLoading.value = false;
+      Get.snackbar(
+        'Deleted',
+        'Complaint removed',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.shade100,
+        colorText: Colors.green.shade900,
+      );
+      loadStudentComplaints();
+      await loadStatistics();
+    } catch (e) {
+      isLoading.value = false;
+      Get.snackbar(
+        'Error',
+        'Failed to delete complaint: $e',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100,
+        colorText: Colors.red.shade900,
+      );
+    }
+  }
 }

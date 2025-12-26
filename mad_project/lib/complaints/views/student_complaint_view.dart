@@ -222,6 +222,30 @@ class StudentComplaintView extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         _buildStatusBadge(complaint.status),
+                        const SizedBox(width: 8),
+                        PopupMenuButton<String>(
+                          onSelected: (v) async {
+                            if (v == 'delete') {
+                              final confirm = await Get.defaultDialog<bool>(
+                                title: 'Confirm Delete',
+                                middleText: 'Delete this complaint?',
+                                textConfirm: 'Delete',
+                                textCancel: 'Cancel',
+                                onConfirm: () => Get.back(result: true),
+                                onCancel: () => Get.back(result: false),
+                              );
+                              if (confirm == true) {
+                                await controller.deleteComplaint(complaint.id);
+                              }
+                            }
+                          },
+                          itemBuilder: (ctx) => [
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),

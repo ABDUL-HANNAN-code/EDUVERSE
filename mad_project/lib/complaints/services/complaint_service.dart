@@ -45,6 +45,75 @@ class ComplaintService {
         createdAt: DateTime.now(),
       );
 
+      // Attempt to enrich complaint with submitter display fields so admin UI
+      // doesn't need to perform extra lookups at render time. If any of the
+      // fields are unavailable, they will be omitted.
+      String? studentName;
+      String? uniName;
+      String? deptName;
+      String? sectionId;
+      String? sectionName;
+      String? semester;
+      String? shift;
+
+      if (!isAnonymous) {
+        try {
+          final userDoc = await _firestore.collection('users').doc(user!.uid).get();
+          final udata = userDoc.data();
+          if (udata != null) {
+            studentName = (udata['displayName'] ?? udata['name'] ?? user.displayName) as String?;
+            // user profile may already contain friendly dept/section names
+            deptName = udata['deptName'] ?? udata['departmentName'] as String?;
+            sectionId = udata['sectionId'] ?? udata['section'] as String?;
+            sectionName = udata['sectionName'] as String?;
+            semester = udata['semester']?.toString();
+            shift = udata['shift']?.toString();
+          }
+
+          // Resolve university name
+          final uniDoc = await _firestore.collection('universities').doc(uniId).get();
+          if (uniDoc.exists) {
+            final u = uniDoc.data();
+            uniName = (u?['name'] ?? u?['title']) as String?;
+          }
+
+          // If deptName or sectionName missing, try resolving from university
+          if ((deptName == null || deptName.isEmpty) && deptId.isNotEmpty) {
+            final ddoc = await _firestore
+                .collection('universities')
+                .doc(uniId)
+                .collection('departments')
+                .doc(deptId)
+                .get();
+            final ddata = ddoc.data();
+            deptName = (ddata?['name'] ?? ddata?['title']) as String? ?? deptName;
+          }
+          if ((sectionName == null || sectionName.isEmpty) && sectionId != null && sectionId!.isNotEmpty) {
+            final sdoc = await _firestore
+                .collection('universities')
+                .doc(uniId)
+                .collection('sections')
+                .doc(sectionId)
+                .get();
+            final sdata = sdoc.data();
+            sectionName = (sdata?['name'] ?? sdata?['title']) as String? ?? sectionName;
+          }
+        } catch (_) {
+          // Non-fatal: enrichment failed, proceed without extra fields
+        }
+      }
+
+      // Rebuild complaint data to include optional display fields
+      final enriched = complaint.copyWith(
+        studentName: studentName,
+        uniName: uniName,
+        deptName: deptName,
+        sectionId: sectionId,
+        sectionName: sectionName,
+        semester: semester,
+        shift: shift,
+      );
+
       try {
         // Create in a batch: write to root collection and mirror under universities/{uniId}/complaints
         final docRef = _firestore.collection(_collectionName).doc();
@@ -54,7 +123,7 @@ class ComplaintService {
             .collection('complaints')
             .doc(docRef.id);
 
-        final data = complaint.toFirestore();
+        final data = enriched.toFirestore();
 
         final batch = _firestore.batch();
         batch.set(docRef, data);

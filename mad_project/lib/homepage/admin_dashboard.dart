@@ -121,8 +121,8 @@ class _AdminDashboardState extends State<AdminDashboard>
       isLoadingProfile = false;
     });
 
-    final tabLength =
-      2 + ((isSuperAdmin || isUniversityAdmin || isDepartmentAdmin) ? 1 : 0) +
+    final tabLength = 2 +
+        ((isSuperAdmin || isUniversityAdmin || isDepartmentAdmin) ? 1 : 0) +
         ((isSuperAdmin || isUniversityAdmin) ? 2 : 0);
     _tabController = TabController(length: tabLength, vsync: this);
     // Ensure UI updates (FAB visibility) when the selected tab changes
