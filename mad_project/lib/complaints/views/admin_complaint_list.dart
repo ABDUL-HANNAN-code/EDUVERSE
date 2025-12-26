@@ -205,10 +205,13 @@ class AdminComplaintList extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                                 Obx(() {
-                                    final profile = controller
+                                  final profile = controller
                                       .studentProfiles[complaint.studentId];
-                                    final studentName = profile?['name'] ?? complaint.studentName;
-                                    final uniName = controller.uniNames[complaint.uniId] ?? complaint.uniName;
+                                  final studentName =
+                                      profile?['name'] ?? complaint.studentName;
+                                  final uniName =
+                                      controller.uniNames[complaint.uniId] ??
+                                          complaint.uniName;
                                   return Row(
                                     children: [
                                       Flexible(
@@ -246,12 +249,16 @@ class AdminComplaintList extends StatelessWidget {
                                 }),
                                 const SizedBox(height: 6),
                                 Obx(() {
-                                    final profile = controller
+                                  final profile = controller
                                       .studentProfiles[complaint.studentId];
-                                    final deptName = profile?['deptName'] ?? complaint.deptName;
-                                    final sectionName = profile?['sectionName'] ?? complaint.sectionName;
-                                    final semester = profile?['semester'] ?? complaint.semester;
-                                    final shift = profile?['shift'] ?? complaint.shift;
+                                  final deptName = profile?['deptName'] ??
+                                      complaint.deptName;
+                                  final sectionName = profile?['sectionName'] ??
+                                      complaint.sectionName;
+                                  final semester = profile?['semester'] ??
+                                      complaint.semester;
+                                  final shift =
+                                      profile?['shift'] ?? complaint.shift;
                                   if ((deptName ?? '').isEmpty &&
                                       (sectionName ?? '').isEmpty &&
                                       (semester ?? '').isEmpty &&

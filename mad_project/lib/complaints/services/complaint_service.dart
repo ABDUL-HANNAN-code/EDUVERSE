@@ -58,10 +58,13 @@ class ComplaintService {
 
       if (!isAnonymous) {
         try {
-          final userDoc = await _firestore.collection('users').doc(user!.uid).get();
+          final userDoc =
+              await _firestore.collection('users').doc(user!.uid).get();
           final udata = userDoc.data();
           if (udata != null) {
-            studentName = (udata['displayName'] ?? udata['name'] ?? user.displayName) as String?;
+            studentName = (udata['displayName'] ??
+                udata['name'] ??
+                user.displayName) as String?;
             // user profile may already contain friendly dept/section names
             deptName = udata['deptName'] ?? udata['departmentName'] as String?;
             sectionId = udata['sectionId'] ?? udata['section'] as String?;
@@ -71,7 +74,8 @@ class ComplaintService {
           }
 
           // Resolve university name
-          final uniDoc = await _firestore.collection('universities').doc(uniId).get();
+          final uniDoc =
+              await _firestore.collection('universities').doc(uniId).get();
           if (uniDoc.exists) {
             final u = uniDoc.data();
             uniName = (u?['name'] ?? u?['title']) as String?;
@@ -86,9 +90,12 @@ class ComplaintService {
                 .doc(deptId)
                 .get();
             final ddata = ddoc.data();
-            deptName = (ddata?['name'] ?? ddata?['title']) as String? ?? deptName;
+            deptName =
+                (ddata?['name'] ?? ddata?['title']) as String? ?? deptName;
           }
-          if ((sectionName == null || sectionName.isEmpty) && sectionId != null && sectionId!.isNotEmpty) {
+          if ((sectionName == null || sectionName.isEmpty) &&
+              sectionId != null &&
+              sectionId!.isNotEmpty) {
             final sdoc = await _firestore
                 .collection('universities')
                 .doc(uniId)
@@ -96,7 +103,8 @@ class ComplaintService {
                 .doc(sectionId)
                 .get();
             final sdata = sdoc.data();
-            sectionName = (sdata?['name'] ?? sdata?['title']) as String? ?? sectionName;
+            sectionName =
+                (sdata?['name'] ?? sdata?['title']) as String? ?? sectionName;
           }
         } catch (_) {
           // Non-fatal: enrichment failed, proceed without extra fields

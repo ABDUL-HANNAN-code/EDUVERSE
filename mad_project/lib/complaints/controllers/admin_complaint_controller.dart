@@ -568,7 +568,8 @@ class AdminComplaintController extends GetxController {
                 onPressed: () async {
                   final confirm = await Get.defaultDialog<bool>(
                     title: 'Confirm Delete',
-                    middleText: 'Are you sure you want to delete this complaint?',
+                    middleText:
+                        'Are you sure you want to delete this complaint?',
                     textConfirm: 'Delete',
                     textCancel: 'Cancel',
                     onConfirm: () => Get.back(result: true),
@@ -580,7 +581,8 @@ class AdminComplaintController extends GetxController {
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Delete Complaint', style: TextStyle(color: Colors.red.shade700)),
+                  child: Text('Delete Complaint',
+                      style: TextStyle(color: Colors.red.shade700)),
                 ),
               ),
             ),

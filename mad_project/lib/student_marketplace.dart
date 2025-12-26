@@ -312,8 +312,21 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
           .collection('users')
           .doc(user.uid)
           .get();
-      final uniId = widget.adminViewUniId ?? doc.data()?['uniId'] as String?;
-      final role = doc.data()?['role'] as String? ?? 'student';
+      final data = doc.data() as Map<String, dynamic>?;
+      final role = data?['role'] as String? ?? 'student';
+
+      // Prefer explicit adminViewUniId from caller. If not provided, for
+      // admin users prefer `adminScope.uniId` stored on the user doc (used
+      // elsewhere in the app). Fallback to `uniId` field if present.
+      String? uniId = widget.adminViewUniId;
+      if (uniId == null || uniId.isEmpty) {
+        if (data != null && data['adminScope'] is Map &&
+            data['adminScope']['uniId'] != null) {
+          uniId = data['adminScope']['uniId']?.toString();
+        } else {
+          uniId = data?['uniId'] as String?;
+        }
+      }
       setState(() {
         _resolvedUniId = uniId;
         userId = user.uid;

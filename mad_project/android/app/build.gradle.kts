@@ -12,8 +12,8 @@ android {
     namespace = "com.example.mad_project"
     compileSdk = flutter.compileSdkVersion
 
-    // 🔧 FIX 1: Required by Firebase & other plugins
-    ndkVersion = "27.0.12077973"
+    // Use a valid installed NDK version
+    ndkVersion = "29.0.14206865"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

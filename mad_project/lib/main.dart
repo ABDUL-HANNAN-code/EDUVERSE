@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -31,22 +32,26 @@ void main() async {
 
   // Initialize Firebase with your project credentials (guarded)
   try {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: "AIzaSyBdgmYim3IN5UmNUo3LPlDHdLEkt_WEXys",
-        appId: "1:772886464594:web:45cb597a29af6e745c378b",
-        messagingSenderId: "772886464594",
-        projectId: "my-project-859f5",
-        storageBucket: "my-project-859f5.firebasestorage.app",
-        authDomain: "my-project-859f5.firebaseapp.com",
-        measurementId: "G-0YWCWRKVHW",
-      ),
-    );
+    // Avoid duplicate initialization when an app already exists (can happen
+    // when plugins or platform code initialize Firebase automatically).
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
   } catch (e, s) {
-    // If Firebase fails to initialize, surface the error in a simple UI
-    // so we can see the exception on device instead of a black screen.
-    runApp(ErrorReportApp(exception: e, stack: s));
-    return;
+    // If the error is the common "already exists" duplicate-app error,
+    // ignore it and continue — Firebase is already initialized on the
+    // native side in some environments.
+    final msg = e.toString();
+    if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
+      // swallow duplicate initialization error
+    } else {
+      // If Firebase fails to initialize, surface the error in a simple UI
+      // so we can see the exception on device instead of a black screen.
+      runApp(ErrorReportApp(exception: e, stack: s));
+      return;
+    }
   }
   // Workaround for intermittent web Firestore watch errors: disable persistence
   try {

@@ -43,9 +43,11 @@ class StudentComplaintView extends StatelessWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: controller.complaints.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final complaint = controller.complaints[index];
                   return _buildComplaintCard(complaint);
@@ -242,7 +244,8 @@ class StudentComplaintView extends StatelessWidget {
                           itemBuilder: (ctx) => [
                             const PopupMenuItem<String>(
                               value: 'delete',
-                              child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              child: Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
                             ),
                           ],
                         ),
@@ -272,7 +275,8 @@ class StudentComplaintView extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          DateFormat('MMM dd, yyyy').format(complaint.createdAt),
+                          DateFormat('MMM dd, yyyy')
+                              .format(complaint.createdAt),
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[600],
