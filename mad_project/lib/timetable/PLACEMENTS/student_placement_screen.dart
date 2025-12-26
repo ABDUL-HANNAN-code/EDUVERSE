@@ -1,5 +1,4 @@
 // File: lib/modules/placement/screens/student_placement_screen.dart
-// Complete Student Placement & Internships with Firebase Authentication & Firestore
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -840,76 +839,93 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
     );
   }
 
-  // ==================== HOME TAB ====================
+  // ==================== HOME TAB (FIXED LAYOUT) ====================
   Widget _buildHomeTab() {
     return CustomScrollView(
       slivers: [
         // AppBar
         SliverAppBar(
-          expandedHeight: 140,
+          // INCREASED HEIGHT: Gives enough room for Title + Search Bar
+          expandedHeight: 170, 
           floating: false,
           pinned: true,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
-              ),
+          backgroundColor: const Color(0xFF5E2686),
+          elevation: 0,
+          
+          // 1. PIN TITLE: This keeps "Placement & Internships" fixed at the top
+          title: const Text(
+            'Placement & Internships',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
-            child: FlexibleSpaceBar(
-              title: const Text(
-                'Placement & Internships',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+          ),
+          centerTitle: true,
+          
+          // 2. SEARCH BAR: Sits in the flexible space below the title
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
                 ),
               ),
-              background: SafeArea(
+              child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
-                  child: Row(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end, // Pushes search bar to bottom
                     children: [
-                      Expanded(
-                        child: Container(
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            style: const TextStyle(color: Colors.white),
-                            decoration: InputDecoration(
-                              hintText: 'Search jobs...',
-                              hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 14,
+                      // Spacer ensures search bar doesn't touch the title
+                      const SizedBox(height: 60), 
+                      
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              prefixIcon: Icon(
-                                Icons.search,
-                                color: Colors.white.withOpacity(0.7),
+                              child: TextField(
+                                style: const TextStyle(color: Colors.white),
+                                decoration: InputDecoration(
+                                  hintText: 'Search jobs...',
+                                  hintStyle: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 14,
+                                  ),
+                                  prefixIcon: Icon(
+                                    Icons.search,
+                                    color: Colors.white.withOpacity(0.7),
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                ),
                               ),
-                              border: InputBorder.none,
-                              contentPadding:
-                                  const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Container(
+                            height: 50,
+                            width: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.tune,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Container(
-                        height: 45,
-                        width: 45,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.tune,
-                          color: Colors.white,
-                        ),
-                      ),
+                      const SizedBox(height: 16), // Bottom padding
                     ],
                   ),
                 ),
@@ -921,12 +937,14 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
               Padding(
                 padding: const EdgeInsets.only(right: 16),
                 child: CircleAvatar(
+                  radius: 18,
                   backgroundColor: Colors.white,
                   child: Text(
                     _studentData!.name[0].toUpperCase(),
                     style: const TextStyle(
                       color: Color(0xFF5E2686),
                       fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -940,7 +958,6 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 20),
-
               // Featured Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1005,7 +1022,14 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
 
                   if (snapshot.hasError) {
                     return Center(
-                      child: Text('Error: ${snapshot.error}'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Text(
+                          'Error: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.red[700]),
+                        ),
+                      ),
                     );
                   }
 
@@ -1017,27 +1041,9 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                         padding: const EdgeInsets.all(40),
                         child: Column(
                           children: [
-                            Icon(
-                              Icons.work_off_outlined,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
+                            Icon(Icons.work_off_outlined, size: 80, color: Colors.grey[400]),
                             const SizedBox(height: 16),
-                            Text(
-                              'No opportunities available',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Check back later for new postings',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
+                            Text('No opportunities available', style: TextStyle(color: Colors.grey[600])),
                           ],
                         ),
                       ),
@@ -1111,7 +1117,18 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                     }
 
                     if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            'Error: ${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.red[700]),
+                          ),
+                        ),
+                      );
                     }
 
                     final applications = snapshot.data?.docs ?? [];
@@ -1418,6 +1435,8 @@ class StudentJobCard extends StatelessWidget {
                 children: [
                   Text(
                     job.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -1427,6 +1446,8 @@ class StudentJobCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     job.company,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[600],
@@ -1442,16 +1463,21 @@ class StudentJobCard extends StatelessWidget {
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        job.location,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                      Expanded(
+                        child: Text(
+                          job.location,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // FIXED ROW TO PREVENT OVERFLOW
                   Row(
                     children: [
                       Container(
@@ -1473,25 +1499,29 @@ class StudentJobCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          job.salary,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            job.salary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A),
+                            ),
                           ),
                         ),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 8), 
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -1502,7 +1532,7 @@ class StudentJobCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${job.matchPercentage}% Match',
+                          '${job.matchPercentage}%',
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1714,6 +1744,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                       const SizedBox(height: 16),
                       Text(
                         widget.job.title,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -1739,19 +1770,19 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Quick Info
-                  Row(
+                  // Quick Info - UPDATED TO WRAP TO PREVENT OVERFLOW
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
                       _buildInfoChip(
                         Icons.attach_money,
                         widget.job.salary,
                       ),
-                      const SizedBox(width: 12),
                       _buildInfoChip(
                         Icons.location_on_outlined,
                         widget.job.location,
                       ),
-                      const SizedBox(width: 12),
                       _buildInfoChip(
                         widget.job.isRemote
                             ? Icons.home_work_outlined
@@ -1874,11 +1905,15 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         children: [
           Icon(icon, size: 16, color: const Color(0xFF5E2686)),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          // Added Flexible to prevent text overflow inside the chip
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],

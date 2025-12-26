@@ -320,7 +320,8 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
       // elsewhere in the app). Fallback to `uniId` field if present.
       String? uniId = widget.adminViewUniId;
       if (uniId == null || uniId.isEmpty) {
-        if (data != null && data['adminScope'] is Map &&
+        if (data != null &&
+            data['adminScope'] is Map &&
             data['adminScope']['uniId'] != null) {
           uniId = data['adminScope']['uniId']?.toString();
         } else {
@@ -1393,8 +1394,20 @@ class MyAdsView extends StatelessWidget {
             ? service.getMyItemsStream(uniId!, userId)
             : service.getMyItemsAcrossUniversitiesStream(userId),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Error: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.red[700]),
+                ),
+              ),
+            );
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }

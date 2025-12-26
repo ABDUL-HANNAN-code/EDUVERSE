@@ -43,7 +43,8 @@ void main() async {
     // ignore it and continue — Firebase is already initialized on the
     // native side in some environments.
     final msg = e.toString();
-    if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
+    if (msg.contains('already exists') ||
+        msg.contains('firebase app') && msg.contains('already')) {
       // swallow duplicate initialization error
     } else {
       // If Firebase fails to initialize, surface the error in a simple UI
@@ -62,8 +63,10 @@ void main() async {
 
   // Print recruiter admin credentials (from environment or defaults)
   try {
-    final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
-    final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
+    final recruiterEmail =
+        Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
+    final recruiterPassword =
+        Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
     debugPrint('RECRUITER_ADMIN_CREDENTIALS:');
     debugPrint('  email: $recruiterEmail');
     debugPrint('  password: $recruiterPassword');
@@ -159,14 +162,14 @@ class UniversityApp extends StatelessWidget {
           getPages: [
             // Auth Routes
             GetPage(name: '/login', page: () => const LoginView()),
-            
+
             // Main Dashboard Routes
             GetPage(
                 name: '/dashboard',
                 page: () =>
                     const HomeDashboard()), // Home Dashboard - main screen after login
             GetPage(name: '/admin', page: () => const AdminDashboard()),
-            
+
             // Feature Module Routes
             GetPage(
                 name: '/lost-and-found',
@@ -175,19 +178,29 @@ class UniversityApp extends StatelessWidget {
             GetPage(
                 name: '/timetable',
                 page: () => const TimetableScreen()), // Timetable module
-            GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
-            
+            GetPage(
+                name: '/marketplace', page: () => const StudentMarketplace()),
+
             // Complaints module
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
-            GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
-            GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
-            
+            GetPage(
+                name: '/complaints/create',
+                page: () => const CreateComplaintScreen()),
+            GetPage(
+                name: '/complaints/admin', page: () => AdminComplaintList()),
+
             // AI Study Planner module
-            GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
-            
+            GetPage(
+                name: '/ai-study-planner',
+                page: () => const StudyPlannerModule()),
+
             // Placement module (student & recruiter)
-            GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
-            GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
+            GetPage(
+                name: '/student-placement',
+                page: () => const StudentPlacementScreen()),
+            GetPage(
+                name: '/recruiter-dashboard',
+                page: () => const RecruiterAdminPanel()),
           ],
         );
       },
@@ -201,18 +214,18 @@ class UniversityApp extends StatelessWidget {
 /// - Logged in and verified -> Show Dashboard
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     if (user != null) {
       // User is logged in
       return user.emailVerified
           ? const HomeDashboard() // Verified -> Dashboard
           : const VerifyEmailView(); // Not verified -> Verify email
     }
-    
+
     // No user logged in -> Show classic Login screen
     return const LoginView();
   }
