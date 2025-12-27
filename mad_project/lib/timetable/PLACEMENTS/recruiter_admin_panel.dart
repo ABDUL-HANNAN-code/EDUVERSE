@@ -1,11 +1,11 @@
 // File: lib/modules/placement/screens/recruiter_admin_panel.dart
 // Complete Recruiter Admin Panel with Firebase Authentication & Firestore
 
-import 'dart:io'; // ADDED: For File operations
-import 'dart:convert'; // ADDED: For base64Decode
-import 'dart:typed_data'; // ADDED: For Uint8List
+import 'dart:io'; // For File operations
+import 'dart:convert'; // For base64Decode
+import 'dart:typed_data'; // For Uint8List
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart'; // ADDED: For saving files
+import 'package:path_provider/path_provider.dart'; // For saving files
 import '../../auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -1544,7 +1544,7 @@ class JobApplicationsScreen extends StatelessWidget {
 
   JobApplicationsScreen({Key? key, required this.job}) : super(key: key);
 
-Future<void> _openResume(BuildContext context, String resumeUrl) async {
+  Future<void> _openResume(BuildContext context, String resumeUrl) async {
     if (resumeUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No resume available')),
@@ -1554,12 +1554,12 @@ Future<void> _openResume(BuildContext context, String resumeUrl) async {
 
     Navigator.push(
       context,
-      MaterialPageRoute(
-          builder: (c) => ResumeViewerPage(resumeUrl: resumeUrl)),
+      MaterialPageRoute(builder: (c) => ResumeViewerPage(resumeUrl: resumeUrl)),
     );
   }
 
-  Future<void> _downloadResume(BuildContext context, String resumeUrl, String userName) async {
+  Future<void> _downloadResume(
+      BuildContext context, String resumeUrl, String userName) async {
     if (resumeUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No resume available')),
@@ -1569,7 +1569,8 @@ Future<void> _openResume(BuildContext context, String resumeUrl) async {
 
     try {
       // Clean filename
-      String filename = '${userName.replaceAll(RegExp(r'\s+'), '_')}_Resume.pdf';
+      String filename =
+          '${userName.replaceAll(RegExp(r'\s+'), '_')}_Resume.pdf';
 
       if (resumeUrl.startsWith('data:application/pdf;base64,')) {
         if (kIsWeb) {
@@ -1586,9 +1587,21 @@ Future<void> _openResume(BuildContext context, String resumeUrl) async {
           final String base64Str = resumeUrl.split(',').last;
           final Uint8List bytes = base64Decode(base64Str);
 
-          // Get directory (Documents directory is safe for app files)
-          final Directory dir = await getApplicationDocumentsDirectory();
-          final File file = File('${dir.path}/$filename');
+          // Get directory
+          Directory? directory;
+          if (Platform.isAndroid) {
+            // Target the public 'Download' folder
+            directory = Directory('/storage/emulated/0/Download');
+            // If it doesn't exist (unlikely), fallback
+            if (!await directory.exists()) {
+              directory = await getExternalStorageDirectory();
+            }
+          } else {
+            // iOS: Use documents directory
+            directory = await getApplicationDocumentsDirectory();
+          }
+
+          final File file = File('${directory?.path}/$filename');
 
           await file.writeAsBytes(bytes);
 
@@ -1596,7 +1609,11 @@ Future<void> _openResume(BuildContext context, String resumeUrl) async {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Saved to ${file.path}'),
-                duration: const Duration(seconds: 4),
+                duration: const Duration(seconds: 5),
+                action: SnackBarAction(
+                  label: 'OK',
+                  onPressed: () {},
+                ),
               ),
             );
           }
@@ -1722,7 +1739,8 @@ Future<void> _openResume(BuildContext context, String resumeUrl) async {
                           tooltip: 'Download resume',
                           onPressed: () async {
                             final url = (app['resumeUrl'] ?? '') as String;
-                            final name = (app['studentName'] ?? 'Student') as String;
+                            final name =
+                                (app['studentName'] ?? 'Student') as String;
                             await _downloadResume(context, url, name);
                           },
                           icon: const Icon(Icons.download_outlined),
