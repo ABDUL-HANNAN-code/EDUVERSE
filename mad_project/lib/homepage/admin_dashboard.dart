@@ -175,11 +175,9 @@ class _AdminDashboardState extends State<AdminDashboard>
   void _showGenerateInviteDialog() {
     // 1. Validation: Ensure we know which university this admin belongs to
     if (selectedUni == null) {
-      Get.snackbar(
-        "Error", 
-        "University ID not found. Please select a university context.",
-        backgroundColor: Colors.red.shade100
-      );
+      Get.snackbar("Error",
+          "University ID not found. Please select a university context.",
+          backgroundColor: Colors.red.shade100);
       return;
     }
 
@@ -201,7 +199,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
           const SizedBox(height: 10),
           Text(
-            "Linking to Uni ID: $selectedUni", 
+            "Linking to Uni ID: $selectedUni",
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
         ],
@@ -212,7 +210,8 @@ class _AdminDashboardState extends State<AdminDashboard>
       onConfirm: () async {
         final email = emailCtrl.text.trim();
         if (email.isEmpty || !email.contains('@')) {
-          Get.snackbar("Error", "Invalid Email", backgroundColor: Colors.orange.shade100);
+          Get.snackbar("Error", "Invalid Email",
+              backgroundColor: Colors.orange.shade100);
           return;
         }
 
@@ -220,23 +219,26 @@ class _AdminDashboardState extends State<AdminDashboard>
           // 2. CALL AUTH SERVICE DIRECTLY
           final String code = await AuthService().generateFacultyInvite(
             facultyEmail: email,
-            uniId: selectedUni!, 
+            uniId: selectedUni!,
             deptId: selectedDept, // Optional: link to department if known
           );
 
           Get.back(); // Close input dialog
 
           // --- 3. IMPLICITLY OPEN EMAIL APP ---
-          final String subject = Uri.encodeComponent("Faculty Connect Invitation");
+          final String subject =
+              Uri.encodeComponent("Faculty Connect Invitation");
           final String body = Uri.encodeComponent(
               "Hello,\n\nYou have been invited to join as Faculty.\n\nPlease use the following Invitation Code to register:\n$code\n\nRegards,\nAdmin");
-          final Uri mailUri = Uri.parse("mailto:$email?subject=$subject&body=$body");
+          final Uri mailUri =
+              Uri.parse("mailto:$email?subject=$subject&body=$body");
 
           try {
             await launchUrl(mailUri, mode: LaunchMode.externalApplication);
           } catch (e) {
             debugPrint("Could not launch email app: $e");
-            Get.snackbar("Info", "Could not open email app automatically.", backgroundColor: Colors.orange.shade100);
+            Get.snackbar("Info", "Could not open email app automatically.",
+                backgroundColor: Colors.orange.shade100);
           }
           // ------------------------------------
 
@@ -257,14 +259,19 @@ class _AdminDashboardState extends State<AdminDashboard>
                 const SizedBox(height: 10),
                 SelectableText(
                   code,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue, letterSpacing: 2),
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                      letterSpacing: 2),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: code));
                     Get.back();
-                    Get.snackbar("Copied", "Code copied to clipboard", backgroundColor: Colors.green.shade100);
+                    Get.snackbar("Copied", "Code copied to clipboard",
+                        backgroundColor: Colors.green.shade100);
                   },
                   icon: const Icon(Icons.copy),
                   label: const Text("Copy Code"),
@@ -273,15 +280,11 @@ class _AdminDashboardState extends State<AdminDashboard>
             ),
             textCancel: null, // removing default cancel button
           );
-
         } catch (e) {
           Get.back();
-          Get.snackbar(
-            'Error', 
-            'Failed to generate invite: $e', 
-            backgroundColor: Colors.red.shade100,
-            duration: const Duration(seconds: 5)
-          );
+          Get.snackbar('Error', 'Failed to generate invite: $e',
+              backgroundColor: Colors.red.shade100,
+              duration: const Duration(seconds: 5));
         }
       },
     );
@@ -764,12 +767,22 @@ class _AdminDashboardState extends State<AdminDashboard>
       final data = doc.data() as Map<String, dynamic>;
       final day = data['day'] as String;
       final startTime = data['start'] as String;
-      final key = '$day-$startTime';
+      final startMin = _timeToMinutes(startTime);
 
-      if (!classesByCell.containsKey(key)) {
-        classesByCell[key] = [];
+      String? matchedSlotStart;
+      for (var slot in timeSlots) {
+        final s = slot['start']!;
+        final e = slot['end']!;
+        final sMin = _timeToMinutes(s);
+        final eMin = _timeToMinutes(e);
+        if (startMin >= sMin && startMin < eMin) {
+          matchedSlotStart = s;
+          break;
+        }
       }
-      classesByCell[key]!.add(doc);
+
+      final key = matchedSlotStart != null ? '$day-$matchedSlotStart' : '$day-$startTime';
+      classesByCell.putIfAbsent(key, () => []).add(doc);
     }
 
     return SizedBox(
@@ -1881,7 +1894,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 subtitle: const Text('Create invite code for professors'),
                 onTap: () {
                   Get.back();
-                  _showGenerateInviteDialog(); 
+                  _showGenerateInviteDialog();
                 },
               ),
           ],
@@ -2395,14 +2408,17 @@ class _AdminDashboardState extends State<AdminDashboard>
   // ==========================================
   List<Map<String, String>> _getTimeSlots(String shift) {
     if (shift == 'morning') {
+      // Morning: 08:00 - 16:00 (80-minute slots)
       return [
         {'start': '08:00', 'end': '09:20'},
         {'start': '09:20', 'end': '10:40'},
         {'start': '10:40', 'end': '12:00'},
         {'start': '12:00', 'end': '13:20'},
         {'start': '13:20', 'end': '14:40'},
+        {'start': '14:40', 'end': '16:00'},
       ];
     } else {
+      // Evening: 14:40 - 21:20
       return [
         {'start': '14:40', 'end': '16:00'},
         {'start': '16:00', 'end': '17:20'},

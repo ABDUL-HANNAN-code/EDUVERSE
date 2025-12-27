@@ -10,17 +10,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
 import 'homepage/profile_screen.dart';
 
-
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
 import 'complaints/views/create_complaint_screen.dart';
 import 'complaints/views/admin_complaint_list.dart';
 
-import 'shared.dart'; 
-import 'auth.dart'; 
-import 'lost_and_found.dart'; 
-import 'timetable/index.dart'; 
-import 'homepage/index.dart'; 
+import 'shared.dart';
+import 'auth.dart';
+import 'lost_and_found.dart';
+import 'timetable/index.dart';
+import 'homepage/index.dart';
 import 'homepage/admin_dashboard.dart';
 
 // AI Study Planner module
@@ -31,7 +30,7 @@ import 'timetable/placements/student_placement_screen.dart';
 import 'timetable/placements/recruiter_admin_panel.dart';
 
 // FACULTY DASHBOARD IMPORT (Preserved from your local changes)
-import 'timetable/FACULTY/faculty_dashboard.dart'; 
+import 'timetable/FACULTY/faculty_dashboard.dart';
 import 'timetable/FACULTY/student_connect.dart';
 
 void main() async {
@@ -46,28 +45,32 @@ void main() async {
     }
   } catch (e, s) {
     final msg = e.toString();
-    if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
+    if (msg.contains('already exists') ||
+        msg.contains('firebase app') && msg.contains('already')) {
       // swallow duplicate initialization error
     } else {
       runApp(ErrorReportApp(exception: e, stack: s));
       return;
     }
   }
-  
+
   // Disable persistence for web compatibility
   try {
-    FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
+    FirebaseFirestore.instance.settings =
+        const Settings(persistenceEnabled: false);
   } catch (e) {}
 
   // Log recruiter creds if available (Debug only)
   try {
-    final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
-    final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
+    final recruiterEmail =
+        Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
+    final recruiterPassword =
+        Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
     debugPrint('RECRUITER_ADMIN_CREDENTIALS:');
     debugPrint('  email: $recruiterEmail');
     debugPrint('  password: $recruiterPassword');
   } catch (_) {}
-  
+
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
   };
@@ -83,7 +86,8 @@ void main() async {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('An error occurred',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Text(details.exceptionAsString()),
                 const SizedBox(height: 12),
@@ -102,7 +106,8 @@ void main() async {
 class ErrorReportApp extends StatelessWidget {
   final Object exception;
   final StackTrace stack;
-  const ErrorReportApp({super.key, required this.exception, required this.stack});
+  const ErrorReportApp(
+      {super.key, required this.exception, required this.stack});
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +122,8 @@ class ErrorReportApp extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Firebase initialization failed',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Text(exception.toString()),
                 const SizedBox(height: 12),
@@ -149,23 +155,39 @@ class UniversityApp extends StatelessWidget {
 
           getPages: [
             GetPage(name: '/login', page: () => const LoginView()),
-            GetPage(name: '/dashboard', page: () => const HomeDashboard()), 
+            GetPage(name: '/dashboard', page: () => const HomeDashboard()),
             GetPage(name: '/admin', page: () => const AdminDashboard()),
-            GetPage(name: '/lost-and-found', page: () => const LostAndFoundLandingPage()), 
-            GetPage(name: '/timetable', page: () => const TimetableScreen()), 
-            GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
+            GetPage(
+                name: '/lost-and-found',
+                page: () => const LostAndFoundLandingPage()),
+            GetPage(name: '/timetable', page: () => const TimetableScreen()),
+            GetPage(
+                name: '/marketplace', page: () => const StudentMarketplace()),
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
-            GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
-            GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
-            GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
-            
+            GetPage(
+                name: '/complaints/create',
+                page: () => const CreateComplaintScreen()),
+            GetPage(
+                name: '/complaints/admin', page: () => AdminComplaintList()),
+            GetPage(
+                name: '/ai-study-planner',
+                page: () => const StudyPlannerModule()),
+
             // Placement module
-            GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
-            GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
+            GetPage(
+                name: '/student-placement',
+                page: () => const StudentPlacementScreen()),
+            GetPage(
+                name: '/recruiter-dashboard',
+                page: () => const RecruiterAdminPanel()),
 
             // Faculty Module (Preserved)
-            GetPage(name: '/faculty-dashboard', page: () => const FacultyDashboardScreen()),
-            GetPage(name: '/faculty-connect', page: () => const MainNavigationScreen()),
+            GetPage(
+                name: '/faculty-dashboard',
+                page: () => const FacultyDashboardScreen()),
+            GetPage(
+                name: '/faculty-connect',
+                page: () => const MainNavigationScreen()),
 
             GetPage(name: '/profile', page: () => const ProfileScreen()),
           ],
@@ -178,40 +200,48 @@ class UniversityApp extends StatelessWidget {
 // AuthGate with Role-Based Routing (Preserved)
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     if (user != null) {
       return StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
-        builder: (context, snapshot) {
-          if(!snapshot.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          
-          final userData = snapshot.data!.data() as Map<String, dynamic>?;
-          final role = userData?['role'] ?? 'student';
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData)
+              return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()));
 
-          // Route based on role
-          if (role == 'faculty') return const FacultyDashboardScreen();
-          if (role == 'recruiter') return const RecruiterAdminPanel();
+            final userData = snapshot.data!.data() as Map<String, dynamic>?;
+            final role = userData?['role'] ?? 'student';
 
-          if (role == 'admin') {
-            // Decide admin landing based on adminScope: department admins should see AdminDashboard,
-            // university-level admins should land on the regular HomeDashboard.
-            final adminScope = userData?['adminScope'];
-            if (adminScope is Map && adminScope['deptId'] != null) {
-              return const AdminDashboard();
+            // Route based on role
+            if (role == 'faculty') return const FacultyDashboardScreen();
+            if (role == 'recruiter') return const RecruiterAdminPanel();
+
+            if (role == 'admin') {
+              // Decide admin landing based on adminScope: department admins should see AdminDashboard,
+              // university-level admins should land on the regular HomeDashboard.
+              final adminScope = userData?['adminScope'];
+              if (adminScope is Map && adminScope['deptId'] != null) {
+                return const AdminDashboard();
+              }
+              // University-level admin (no deptId) — open HomeDashboard instead of Admin panel
+              return user.emailVerified
+                  ? const HomeDashboard()
+                  : const VerifyEmailView();
             }
-            // University-level admin (no deptId) — open HomeDashboard instead of Admin panel
-            return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
-          }
 
-          return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
-        }
-      );
+            return user.emailVerified
+                ? const HomeDashboard()
+                : const VerifyEmailView();
+          });
     }
-    
+
     return const LoginView();
   }
 }
