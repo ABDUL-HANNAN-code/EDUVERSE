@@ -407,7 +407,11 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                     const Icon(Icons.inventory_2_outlined, color: Colors.white),
                 tooltip: 'My Ads',
                 onPressed: () {
-                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  // Prefer the resolved `userId` (set during init), but
+                  // fall back to FirebaseAuth directly if necessary. This
+                  // avoids falsely treating logged-in users as anonymous
+                  // while async profile resolution completes.
+                  final uid = userId ?? FirebaseAuth.instance.currentUser?.uid;
                   if (uid == null) {
                     MySnackBar().mySnackBar(
                       header: 'Not signed in',

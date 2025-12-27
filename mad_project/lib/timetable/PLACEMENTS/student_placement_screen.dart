@@ -1,5 +1,5 @@
 // File: lib/modules/placement/screens/student_placement_screen.dart
-// Updated Student Placement Screen with Resume Validation
+// Updated Student Placement Screen: Fixed Upload Error, Removed Logout, Added Button Actions
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -818,20 +818,31 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
         const SnackBar(content: Text('Uploading resume...')),
       );
 
+      // FIXED: Use a simple, timestamped filename to prevent object-not-found errors
+      // caused by special characters or path issues on mobile.
+      final String safeFilename = 'resume_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      
       final storageRef = FirebaseStorage.instance
           .ref()
-          .child('resumes/${user.uid}/${picked.name}');
+          .child('resumes/${user.uid}/$safeFilename');
 
       UploadTask uploadTask;
+      
+      // FIXED: Metadata is crucial for some devices
+      final metadata = SettableMetadata(
+        contentType: 'application/pdf',
+        customMetadata: {'originalName': name},
+      );
+
       if (kIsWeb) {
         final bytes = picked.bytes;
         if (bytes == null) return;
-        uploadTask = storageRef.putData(
-            bytes, SettableMetadata(contentType: 'application/pdf'));
+        uploadTask = storageRef.putData(bytes, metadata);
       } else {
         final path = picked.path;
         if (path == null) return;
-        uploadTask = storageRef.putFile(File(path));
+        // Mobile upload using file path
+        uploadTask = storageRef.putFile(File(path), metadata);
       }
 
       final snapshot = await uploadTask;
@@ -851,6 +862,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
         ),
       );
     } catch (e) {
+      print("Upload Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Upload failed: $e'),
@@ -868,11 +880,18 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
     return '${size.toStringAsFixed(decimals)} ${suffixes[i]}';
   }
 
-  Future<void> _handleSignOut() async {
-    await _authService.signOut();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const StudentLoginScreen(),
+  // --- Helpers for Profile Buttons ---
+  void _showComingSoon(BuildContext context, String title) {
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(title),
+        content: const Text(
+            'This feature is under development and will be available soon.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c), child: const Text('OK')),
+        ],
       ),
     );
   }
@@ -1395,18 +1414,14 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                 _buildProfileOption(
                   Icons.notifications_outlined,
                   'Notifications',
-                  () {},
+                  () => _showComingSoon(context, 'Notifications'),
                 ),
                 _buildProfileOption(
                   Icons.help_outline,
                   'Help & Support',
-                  () {},
+                  () => _showComingSoon(context, 'Help & Support'),
                 ),
-                _buildProfileOption(
-                  Icons.logout,
-                  'Sign Out',
-                  _handleSignOut,
-                ),
+                // Logout Removed from Profile
                 const SizedBox(height: 20),
               ],
             ),
