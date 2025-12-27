@@ -331,13 +331,20 @@ class _AdminDashboardState extends State<AdminDashboard>
             ? Colors.purple
             : (isUniversityAdmin ? Colors.indigo : Colors.teal),
         actions: [
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu),
+              tooltip: 'Open Drawer',
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
           if (isSuperAdmin)
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: _showWizardMenu,
             ),
           // Invite Button (Preserved from your file)
-          if (!isSuperAdmin && (isUniversityAdmin || isDepartmentAdmin))
+          if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
             IconButton(
               icon: const Icon(Icons.person_add_alt_1),
               tooltip: 'Generate Faculty Invite',
@@ -820,8 +827,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         }
       }
 
-        final normalizedKey = '$day-${_normalizeToHHMM(matchedSlotStart ?? startTime)}';
-        classesByCell.putIfAbsent(normalizedKey, () => []).add(doc);
+      final normalizedKey =
+          '$day-${_normalizeToHHMM(matchedSlotStart ?? startTime)}';
+      classesByCell.putIfAbsent(normalizedKey, () => []).add(doc);
     }
 
     return SizedBox(
@@ -2076,16 +2084,15 @@ class _AdminDashboardState extends State<AdminDashboard>
                   _startSectionWizard();
                 },
               ),
-            if (selectedUni != null)
-              ListTile(
-                leading: const Icon(Icons.vpn_key, color: Colors.orange),
-                title: const Text('Generate Faculty Invite'),
-                subtitle: const Text('Create invite code for professors'),
-                onTap: () {
-                  Get.back();
-                  _showGenerateInviteDialog();
-                },
-              ),
+            ListTile(
+              leading: const Icon(Icons.vpn_key, color: Colors.orange),
+              title: const Text('Generate Faculty Invite'),
+              subtitle: const Text('Create invite code for professors'),
+              onTap: () {
+                Get.back();
+                _showGenerateInviteDialog();
+              },
+            ),
           ],
         ),
       ),
