@@ -18,6 +18,7 @@ class FacultyDashboardController extends GetxController {
   final RxString facultyName = ''.obs;
   final RxString facultyRole = ''.obs;
   final RxString facultyImageUrl = ''.obs;
+  final RxInt navIndex = 0.obs; // 0: Dashboard, 1: Schedule, 2: Messages, 3: Alerts
   
   @override
   void onInit() {
@@ -190,48 +191,73 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
   Widget build(BuildContext context) {
     // Inject controller
     Get.put(FacultyDashboardController());
-    
-    return Scaffold(
-      backgroundColor: primaryBg,
-      appBar: AppBar(
+    return Obx(() {
+      Widget bodyContent;
+      switch (controller.navIndex.value) {
+        case 1:
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: _buildScheduleList(),
+          );
+          break;
+        case 2:
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: _buildMessagesPage(),
+          );
+          break;
+        case 3:
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: _buildAlertsPage(),
+          );
+          break;
+        case 0:
+        default:
+          bodyContent = SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _buildProfileCard(),
+                const SizedBox(height: 20),
+                _buildStatsCards(),
+                const SizedBox(height: 24),
+                _buildTabControl(),
+                const SizedBox(height: 20),
+                // Dynamic Body Content within Dashboard tab
+                Obx(() {
+                  if (controller.selectedTab.value == 'Requests') {
+                    return _buildRequestsList();
+                  } else {
+                    return _buildScheduleList();
+                  }
+                }),
+              ],
+            ),
+          );
+      }
+
+      return Scaffold(
         backgroundColor: primaryBg,
-        elevation: 0,
-        title: const Text(
-          'Faculty Portal',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white70),
-            onPressed: controller.logout,
-            tooltip: 'Logout',
+        appBar: AppBar(
+          backgroundColor: primaryBg,
+          elevation: 0,
+          title: const Text(
+            'Faculty Portal',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _buildProfileCard(),
-            const SizedBox(height: 20),
-            _buildStatsCards(),
-            const SizedBox(height: 24),
-            _buildTabControl(),
-            const SizedBox(height: 20),
-            
-            // Dynamic Body Content
-            Obx(() {
-              if (controller.selectedTab.value == 'Requests') {
-                return _buildRequestsList();
-              } else {
-                return _buildScheduleList();
-              }
-            }),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.white70),
+              onPressed: controller.logout,
+              tooltip: 'Logout',
+            ),
           ],
         ),
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
+        body: bodyContent,
+        bottomNavigationBar: _buildBottomNav(),
+      );
+    });
   }
   
   // 1. Profile & Status Card
@@ -663,6 +689,81 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
       },
     );
   }
+
+  Widget _buildMessagesPage() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Center(child: Text('Login Required'));
+
+    // Simple messages placeholder: reads from `messages` collection where `to`==uid
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('messages')
+          .where('to', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.white));
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]), const SizedBox(height: 16), Text('No messages', style: TextStyle(color: Colors.grey[600]))]),
+          );
+        }
+
+        return Column(
+          children: snap.data!.docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            final from = data['fromName'] ?? data['from'] ?? 'User';
+            final text = data['text'] ?? '';
+            final created = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            return ListTile(
+              title: Text(from),
+              subtitle: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Text(DateFormat('h:mm a').format(created), style: TextStyle(color: Colors.grey[600])),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildAlertsPage() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Center(child: Text('Login Required'));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('alerts')
+          .where('to', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Colors.white));
+        if (!snap.hasData || snap.data!.docs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(16)),
+            child: Column(children: [Icon(Icons.notifications_none, size: 40, color: Colors.grey[300]), const SizedBox(height: 16), Text('No alerts', style: TextStyle(color: Colors.grey[600]))]),
+          );
+        }
+
+        return Column(
+          children: snap.data!.docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            final title = data['title'] ?? 'Alert';
+            final body = data['body'] ?? '';
+            final created = (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
+            return ListTile(
+              title: Text(title),
+              subtitle: Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Text(DateFormat('MMM d').format(created), style: TextStyle(color: Colors.grey[600])),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
   
   // 5. Bottom Navigation
   Widget _buildBottomNav() {
@@ -677,13 +778,14 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
           ),
         ],
       ),
-      child: BottomNavigationBar(
+      child: Obx(() => BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: primaryBg,
         selectedItemColor: accentColor,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
-        currentIndex: 0,
+        currentIndex: controller.navIndex.value,
+        onTap: (i) => controller.navIndex.value = i,
         elevation: 0,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
@@ -691,7 +793,7 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
           BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: 'Messages'),
           BottomNavigationBarItem(icon: Icon(Icons.notifications_none), label: 'Alerts'),
         ],
-      ),
+      )),
     );
   }
 }

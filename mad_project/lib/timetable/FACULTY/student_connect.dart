@@ -1168,9 +1168,11 @@ class BookingBottomSheet extends StatelessWidget {
                 Expanded(
                   child: Theme(
                     data: Theme.of(context).copyWith(
-                      colorScheme: Theme.of(context)
-                          .colorScheme
-                          .copyWith(primary: accentColor),
+                      colorScheme: ColorScheme.light(
+                        primary: accentColor,
+                        onPrimary: Colors.white,
+                      ),
+                      primaryColor: accentColor,
                     ),
                     child: CalendarDatePicker(
                       initialDate: initialDate,
