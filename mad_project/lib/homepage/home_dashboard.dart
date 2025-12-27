@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import '../shared.dart';
 import '../poster/marketplace_poster_slideshow.dart';
+import '../announcements/student_announcement_view.dart';
 
 /// Modern Home/Dashboard Module - Redesigned for Eduverse
 class HomeDashboard extends StatefulWidget {
@@ -445,10 +446,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
           route: '/marketplace',
         ),
         ModuleItem(
-          title: 'Events & QR',
-          description: 'Campus events',
-          icon: Icons.qr_code_scanner,
+          title: 'Announcements',
+          description: 'Campus announcements & events',
+          icon: Icons.announcement,
           gradientColors: [Color(0xFF2980B9), Color(0xFF3498DB)],
+          route: '/student_announcements_view',
         ),
       ];
 
@@ -472,31 +474,46 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _buildModuleCard(ModuleItem module) {
     return GestureDetector(
       onTap: () {
-        if (module.route != null) {
-          // Special-case Complaints: route admin users to admin view
-          if (module.route == '/complaints') {
-            final role = userRole;
-            final isAdmin = role == 'admin' || role == 'super_admin';
-            if (isAdmin) {
-              Get.toNamed('/complaints/admin');
-            } else {
-              Get.toNamed('/complaints');
+        try {
+          if (module.route != null) {
+            // Special-case Complaints: route admin users to admin view
+            if (module.route == '/complaints') {
+              final role = userRole;
+              final isAdmin = role == 'admin' || role == 'super_admin';
+              if (isAdmin) {
+                Get.toNamed('/complaints/admin');
+              } else {
+                Get.toNamed('/complaints');
+              }
+              return;
             }
-            return;
+
+            debugPrint('Module tap: navigating to ${module.route}');
+
+            // Safe-path for announcements route to avoid name lookup issues
+            if (module.route == '/student_announcements_view' || module.route == '/announcements') {
+              Get.to(() => const StudentAnnouncementFeed());
+              return;
+            }
+
+            Get.toNamed(module.route!);
+          } else {
+            Get.snackbar(
+              'Coming Soon',
+              '${module.title} is under development',
+              backgroundColor: Colors.white,
+              colorText: AppColors.darkGrey,
+              borderRadius: 12,
+              margin: const EdgeInsets.all(16),
+              snackPosition: SnackPosition.BOTTOM,
+              icon: Icon(module.icon, color: module.gradientColors[0]),
+              duration: const Duration(seconds: 2),
+            );
           }
-          Get.toNamed(module.route!);
-        } else {
-          Get.snackbar(
-            'Coming Soon',
-            '${module.title} is under development',
-            backgroundColor: Colors.white,
-            colorText: AppColors.darkGrey,
-            borderRadius: 12,
-            margin: const EdgeInsets.all(16),
-            snackPosition: SnackPosition.BOTTOM,
-            icon: Icon(module.icon, color: module.gradientColors[0]),
-            duration: const Duration(seconds: 2),
-          );
+        } catch (e, s) {
+          debugPrint('Navigation error: $e');
+          debugPrint('$s');
+          Get.snackbar('Navigation error', e.toString(), backgroundColor: Colors.white);
         }
       },
       child: Container(

@@ -10,6 +10,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
 import 'homepage/profile_screen.dart';
 
+<<<<<<< HEAD
+=======
+// Announcements module
+import 'announcements/student_announcement_view.dart';
+
+>>>>>>> 33202b80f71848ab788679bd5df729812f458db9
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
 import 'complaints/views/create_complaint_screen.dart';
@@ -76,6 +82,7 @@ void main() async {
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
+<<<<<<< HEAD
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(title: const Text('Error')),
@@ -94,6 +101,25 @@ void main() async {
                 Text(details.stack.toString()),
               ],
             ),
+=======
+    // Return a simple Scaffold instead of a nested MaterialApp to avoid
+    // creating another Navigator (which can cause GlobalKey conflicts).
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('An error occurred',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Text(details.exceptionAsString()),
+              const SizedBox(height: 12),
+              Text(details.stack.toString()),
+            ],
+>>>>>>> 33202b80f71848ab788679bd5df729812f458db9
           ),
         ),
       ),
@@ -190,6 +216,11 @@ class UniversityApp extends StatelessWidget {
                 page: () => const MainNavigationScreen()),
 
             GetPage(name: '/profile', page: () => const ProfileScreen()),
+
+            // --- ADDED ANNOUNCEMENTS ROUTES HERE ---
+            GetPage(name: '/announcements', page: () => const StudentAnnouncementFeed()),
+            // alias route (used by dashboard tile)
+            GetPage(name: '/student_announcements_view', page: () => const StudentAnnouncementFeed()),
           ],
         );
       },
@@ -216,6 +247,7 @@ class AuthGate extends StatelessWidget {
               return const Scaffold(
                   body: Center(child: CircularProgressIndicator()));
 
+<<<<<<< HEAD
             final userData = snapshot.data!.data() as Map<String, dynamic>?;
             final role = userData?['role'] ?? 'student';
 
@@ -240,6 +272,18 @@ class AuthGate extends StatelessWidget {
                 ? const HomeDashboard()
                 : const VerifyEmailView();
           });
+=======
+          // Route based on role
+          if (role == 'faculty') return const FacultyDashboardScreen();
+          if (role == 'recruiter') return const RecruiterAdminPanel();
+          if (role == 'admin') return const AdminDashboard();
+          
+          return user.emailVerified 
+              ? const HomeDashboard() 
+              : const VerifyEmailView();
+        }
+      );
+>>>>>>> 33202b80f71848ab788679bd5df729812f458db9
     }
 
     return const LoginView();
