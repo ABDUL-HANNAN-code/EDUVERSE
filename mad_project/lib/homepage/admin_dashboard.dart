@@ -1048,7 +1048,6 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return GestureDetector(
       onTap: () => _showClassDetails(data),
-      onLongPress: () => _showEditClassDialog(data),
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
@@ -1379,7 +1378,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Close')),
-          if (isSuperAdmin)
+          if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
             TextButton(
               onPressed: () {
                 Get.back();
@@ -1410,13 +1409,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               },
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
-          ElevatedButton(
-            onPressed: () {
-              Get.back();
-              _showEditClassDialog(data);
-            },
-            child: const Text('Edit'),
-          ),
+          // Edit action removed — editing classes disabled
         ],
       ),
     );
@@ -1440,150 +1433,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  void _showEditClassDialog(Map<String, dynamic> data) {
-    final subjectCtrl = TextEditingController(text: data['subject']);
-    final teacherCtrl = TextEditingController(text: data['teacher']);
-    final roomCtrl = TextEditingController(text: data['location']);
-    String day = data['day'];
-    String startTime = data['start'];
-    bool isLab = data['isLab'] ?? false;
-
-    Get.defaultDialog(
-      title: "Edit Class",
-      content: StatefulBuilder(
-        builder: (context, setState) {
-          final availableSlots = _getAvailableSlots(selectedShift, isLab);
-          if (!availableSlots.contains(startTime)) {
-            startTime = availableSlots.first;
-          }
-          final endTime = _calculateEndTime(startTime, isLab);
-
-          return SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SwitchListTile(
-                  title: const Text("Is this a Lab?"),
-                  subtitle: Text(
-                    isLab ? "Duration: 180 minutes" : "Duration: 80 minutes",
-                  ),
-                  value: isLab,
-                  onChanged: (val) => setState(() => isLab = val),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField(
-                  value: day,
-                  items: days
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (v) => setState(() => day = v!),
-                  decoration: const InputDecoration(
-                    labelText: "Day",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: startTime,
-                  items: availableSlots
-                      .map(
-                        (slot) => DropdownMenuItem(
-                          value: slot,
-                          child: Text(
-                            '$slot - ${_calculateEndTime(slot, isLab)}',
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => startTime = v!),
-                  decoration: const InputDecoration(
-                    labelText: "Time Slot",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: subjectCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Subject",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: roomCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Room No",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: teacherCtrl,
-                  decoration: const InputDecoration(
-                    labelText: "Teacher Name",
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-      confirm: ElevatedButton(
-        child: const Text("Update"),
-        onPressed: () async {
-          final endTime = _calculateEndTime(startTime, isLab);
-
-          final conflict = await _service.checkConflict(
-            uniId: selectedUni!,
-            day: day,
-            startTime: startTime,
-            endTime: endTime,
-            room: roomCtrl.text.trim(),
-            teacher: teacherCtrl.text.trim(),
-            excludeDocId: data['docId'],
-          );
-
-          if (conflict != null) {
-            Get.snackbar(
-              "Conflict Detected!",
-              conflict,
-              backgroundColor: Colors.red.shade100,
-              duration: const Duration(seconds: 5),
-            );
-            return;
-          }
-
-          await _db
-              .collection('universities')
-              .doc(selectedUni!)
-              .collection('timetables')
-              .doc(data['docId'])
-              .update({
-            'day': day,
-            'start': startTime,
-            'end': endTime,
-            'subject': subjectCtrl.text.trim(),
-            'location': roomCtrl.text.trim(),
-            'teacher': teacherCtrl.text.trim(),
-            'isLab': isLab,
-          });
-
-          Get.back();
-          Get.snackbar(
-            "Success",
-            "Class updated successfully",
-            backgroundColor: Colors.green.shade100,
-          );
-        },
-      ),
-      cancel: TextButton(
-        onPressed: () => Get.back(),
-        child: const Text("Cancel"),
-      ),
-    );
-  }
+  // Edit class dialog and logic removed per request.
 
   void _showAddClassDialog() {
     if (selectedUni == null ||
