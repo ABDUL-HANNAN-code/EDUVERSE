@@ -7,6 +7,7 @@
 // firebase_core: ^2.24.2
 // cloud_firestore: ^4.13.6
 // firebase_auth: ^4.15.3
+// flutter_dotenv: ^5.1.0  <-- Make sure this is added
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,14 +25,15 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // Added for .env support
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 // Prefer API key from compile-time environment `GROQ_API_KEY` (use --dart-define)
-// NOTE: Temporarily embedding the user's provided key for quick testing. Remove
-// this and require --dart-define in production to avoid leaking secrets.
-const String groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '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');
+// Do NOT ship a hardcoded key. Default to empty so missing configuration
+// is explicit and the app can guide the developer/user to configure a valid key.
+const String groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
 // Color Palette
 const Color kPrimaryColor = Color(0xFF6C63FF);
@@ -80,8 +82,60 @@ class GroqService {
   static const String _defaultModel = 'llama-3.1-8b-instant';
   static const String _longContextModel = 'meta-llama/llama-4-maverick-17b-128e-instruct';
 
+  // Helper to ensure .env is loaded (lazy loading to avoid modifying main.dart)
+  static bool _isEnvLoaded = false;
+  static Future<void> _ensureEnvLoaded() async {
+    if (_isEnvLoaded) return;
+    try {
+      await dotenv.load(fileName: ".env");
+      _isEnvLoaded = true;
+    } catch (e) {
+      debugPrint("GroqService: Failed to load .env file: $e");
+      // Mark as loaded to prevent retry loops on failure
+      _isEnvLoaded = true; 
+    }
+  }
+
+  // Resolve API key from multiple sources. Prefers (highest->lowest):
+  // 1. explicit `apiKey` param
+  // 2. .env file (GROQ_API_KEY)
+  // 3. SharedPreferences runtime value (saved via settings)
+  // 4. compile-time `GROQ_API_KEY` (--dart-define)
+  // 5. assets/groq_config.json
+  static Future<Map<String, String>> _resolveApiKey(String? param) async {
+    String key = '';
+    String source = 'none';
+    if (param != null && param.isNotEmpty) {
+      return {'key': param.trim(), 'source': 'param'};
+    }
+
+    // Attempt to load from .env
+    await _ensureEnvLoaded();
+    final envKey = dotenv.env['GROQ_API_KEY'];
+    if (envKey != null && envKey.isNotEmpty) {
+      return {'key': envKey.trim(), 'source': '.env'};
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('GROQ_API_KEY') ?? '';
+      if (saved.isNotEmpty) return {'key': saved.trim(), 'source': 'preferences'};
+    } catch (_) {}
+
+    if (groqApiKey.isNotEmpty) return {'key': groqApiKey, 'source': 'compile_define'};
+
+    try {
+      final raw = await rootBundle.loadString('assets/groq_config.json');
+      final parsed = jsonDecode(raw) as Map<String, dynamic>;
+      final assetKey = (parsed['GROQ_API_KEY']?.toString() ?? '').trim();
+      if (assetKey.isNotEmpty) return {'key': assetKey, 'source': 'asset'};
+    } catch (_) {}
+
+    return {'key': '', 'source': 'none'};
+  }
+
   /// Send a chat completion request to Groq. `apiKey` is optional and will
-  /// default to the compile-time `groqApiKey` if not provided.
+  /// default to the .env key or compile-time `groqApiKey` if not provided.
   static Future<String> sendMessage({
     String? apiKey,
     required String userMessage,
@@ -102,17 +156,17 @@ class GroqService {
 
       final usedModel = model ?? _selectModelForMessage(userMessage);
 
-      // Resolve API key: prefer the explicit param, otherwise fall back to the
-      // compile-time define. Do not print the key in logs.
-      final keyToUse = (apiKey != null && apiKey.isNotEmpty) ? apiKey : groqApiKey;
-      if (keyToUse.isEmpty) {
-        debugPrint('GroqService warning: no GROQ API key provided; requests will fail.');
-      }
+      // Resolve API key using unified helper
+      final resolved = await _resolveApiKey(apiKey);
+      final String keyToUse = resolved['key'] ?? '';
+      final String keySource = resolved['source'] ?? 'none';
 
-      final headers = {
-        'Authorization': 'Bearer <redacted-key-present>', // don't log the real key
-        'Content-Type': 'application/json',
-      };
+      debugPrint('GroqService: API key present=${keyToUse.isNotEmpty}; source=$keySource');
+
+      if (keyToUse.isEmpty) {
+        debugPrint('GroqService warning: no GROQ API key provided; requests will be skipped.');
+        return 'AI not configured: please provide a valid GROQ API key in settings or .env file.';
+      }
 
       final request = http.post(
         Uri.parse(_endpoint),
@@ -129,7 +183,7 @@ class GroqService {
       );
 
       // Debug: log the outgoing payload shape and truncated body, but never
-      // print the API key. Indicate whether an Authorization header is present.
+      // print the API key.
       try {
         final Map<String, dynamic> outBody = {
           'model': usedModel,
@@ -138,14 +192,6 @@ class GroqService {
           'max_tokens': maxTokens,
         };
         debugPrint('GroqService outgoing payload shape: ${jsonEncode(outBody)}');
-        final fullBody = jsonEncode({
-          'model': usedModel,
-          'messages': messages,
-          'temperature': temperature,
-          'max_tokens': maxTokens,
-        });
-        debugPrint('GroqService outgoing body (truncated): ${fullBody.length > 1000 ? fullBody.substring(0, 1000) + "..." : fullBody}');
-        debugPrint('GroqService outgoing headers keys: ${headers.keys.toList()} (Authorization present: ${keyToUse.isNotEmpty})');
       } catch (_) {}
 
       // enforce a timeout so the UI doesn't stay stuck indefinitely
@@ -160,7 +206,6 @@ class GroqService {
         }
       } else {
         // Log the non-200 response body to help diagnose payload/validation issues.
-        // Do NOT log the API key.
         try {
           debugPrint('GroqService non-200 response: ${response.statusCode}');
           debugPrint('GroqService response body (truncated): ${response.body.length > 1000 ? response.body.substring(0, 1000) + "..." : response.body}');
@@ -178,9 +223,10 @@ class GroqService {
             errorMsg = parsed['message'].toString();
           }
         } catch (_) {}
-        // If model decommissioned or any non-200, return a quick local fallback
+        
+        // If non-200 or model decommissioned, return local fallback to keep UI responsive.
         if (errorCode == 'model_decommissioned' || response.statusCode != 200) {
-          debugPrint('GroqService: returning local fallback due to non-200 or decommissioned model');
+          debugPrint('GroqService: returning local fallback due to non-200 or decommissioned model (status=${response.statusCode}, code=$errorCode)');
           try {
             return _localFallback(userMessage);
           } catch (_) {
@@ -208,7 +254,10 @@ class GroqService {
 
   /// Helper: list available models from the Groq API (returns model ids).
   static Future<List<String>> listModels({String? apiKey}) async {
-    final keyToUse = (apiKey != null && apiKey.isNotEmpty) ? apiKey : groqApiKey;
+    final resolved = await _resolveApiKey(apiKey);
+    final keyToUse = resolved['key'] ?? '';
+    final keySource = resolved['source'] ?? 'none';
+    debugPrint('GroqService.listModels: API key present=${keyToUse.isNotEmpty}; source=$keySource');
     final uri = Uri.parse('https://api.groq.com/openai/v1/models');
     try {
       final resp = await http.get(uri, headers: {
@@ -690,7 +739,7 @@ class ChatProvider with ChangeNotifier {
       }
 
       final response = await GroqService.sendMessage(
-        apiKey: groqApiKey,
+        // Note: apiKey is omitted here to rely on the unified _resolveApiKey in GroqService
         userMessage: message,
         conversationHistory: _messages.sublist(0, _messages.length - 1),
       );
@@ -1363,7 +1412,12 @@ class StudyPlannerPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: Colors.white),
-            onPressed: () {},
+              onPressed: () async {
+                await showDialog<void>(
+                  context: context,
+                  builder: (c) => const _ApiKeySettingsDialog(),
+                );
+              },
           ),
         ],
       ),
@@ -1566,6 +1620,118 @@ class ProgressCard extends StatelessWidget {
 
         return container;
       },
+    );
+  }
+}
+
+// Simple dialog to let an APK user enter/store the GROQ API key at runtime.
+class _ApiKeySettingsDialog extends StatefulWidget {
+  const _ApiKeySettingsDialog({Key? key}) : super(key: key);
+
+  @override
+  State<_ApiKeySettingsDialog> createState() => _ApiKeySettingsDialogState();
+}
+
+class _ApiKeySettingsDialogState extends State<_ApiKeySettingsDialog> {
+  final _controller = TextEditingController();
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _controller.text = prefs.getString('GROQ_API_KEY') ?? '';
+    } catch (e) {
+      debugPrint('Failed to load GROQ_API_KEY: $e');
+    }
+    setState(() => _loading = false);
+  }
+
+  Future<void> _save() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('GROQ_API_KEY', _controller.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('GROQ API key saved')));
+      }
+      Navigator.of(context).pop();
+    } catch (e) {
+      debugPrint('Failed to save GROQ_API_KEY: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save API key')));
+      }
+    }
+  }
+
+  Future<void> _clear() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('GROQ_API_KEY');
+      _controller.text = '';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('GROQ API key cleared')));
+      }
+      Navigator.of(context).pop();
+    } catch (e) {
+      debugPrint('Failed to clear GROQ_API_KEY: $e');
+    }
+  }
+
+  Future<void> _testKey() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter an API key to test')));
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final models = await GroqService.listModels(apiKey: key);
+      if (models.isNotEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Key valid — ${models.length} models available')));
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Key appears invalid or returned no models')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error testing key: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('AI Configuration'),
+      content: _loading
+          ? const SizedBox(height: 60, child: Center(child: CircularProgressIndicator()))
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Enter your GROQ API key to enable AI features.'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _controller,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'GROQ API Key',
+                    hintText: 'sk-...',
+                  ),
+                ),
+              ],
+            ),
+      actions: [
+        TextButton(onPressed: _clear, child: const Text('Clear')),
+        TextButton(
+          onPressed: _loading ? null : _testKey,
+          child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Test'),
+        ),
+        ElevatedButton(onPressed: _save, child: const Text('Save')),
+      ],
     );
   }
 }
@@ -2767,6 +2933,3 @@ class ResourcesCard extends StatelessWidget {
     });
   }
 }
-
-
-
