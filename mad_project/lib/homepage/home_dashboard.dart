@@ -162,6 +162,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   ),
                 ],
               ),
+              
               actions: [
                 if (userRole == 'admin' || userRole == 'super_admin')
                   IconButton(
@@ -170,9 +171,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     onPressed: () => Get.toNamed('/admin'),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.logout, color: AppColors.darkGrey),
-                  onPressed: _logout,
+                  icon: const Icon(Icons.person),
+                  onPressed: () => Get.toNamed('/profile'),
                 ),
+                  
+                // IconButton(
+                //   icon: const Icon(Icons.logout, color: AppColors.darkGrey),
+                //   onPressed: _logout,
+                // ),
               ],
             ),
 

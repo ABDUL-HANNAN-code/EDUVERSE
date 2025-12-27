@@ -8,6 +8,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
+import 'homepage/profile_screen.dart';
+
 
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
@@ -164,6 +166,8 @@ class UniversityApp extends StatelessWidget {
             // Faculty Module (Preserved)
             GetPage(name: '/faculty-dashboard', page: () => const FacultyDashboardScreen()),
             GetPage(name: '/faculty-connect', page: () => const MainNavigationScreen()),
+
+            GetPage(name: '/profile', page: () => const ProfileScreen()),
           ],
         );
       },

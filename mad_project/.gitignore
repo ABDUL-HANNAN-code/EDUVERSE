@@ -50,3 +50,7 @@ credietntail.txt
 # Firebase / Google Cloud secrets
 *.json
 **/firebase-adminsdk-*.json
+
+# --- ADDED: Secrets & Env Files ---
+.env
+assets/.env
