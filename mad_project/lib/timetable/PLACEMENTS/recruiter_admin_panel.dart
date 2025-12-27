@@ -1,8 +1,17 @@
 // File: lib/modules/placement/screens/recruiter_admin_panel.dart
 // Complete Recruiter Admin Panel with Firebase Authentication & Firestore
 
+import 'dart:io'; // ADDED: For File operations
+import 'dart:convert'; // ADDED: For base64Decode
+import 'dart:typed_data'; // ADDED: For Uint8List
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart'; // ADDED: For saving files
 import '../../auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'web_download.dart' show triggerDownload;
+import 'resume_viewer.dart' show ResumeViewerPage;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -139,10 +148,8 @@ class RecruiterAuthService {
       );
 
       // Check if user is a recruiter
-      DocumentSnapshot userDoc = await _firestore
-          .collection('users')
-          .doc(result.user!.uid)
-          .get();
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(result.user!.uid).get();
 
       if (!userDoc.exists) {
         await _auth.signOut();
@@ -165,7 +172,10 @@ class RecruiterAuthService {
     } on FirebaseAuthException catch (e) {
       return {'success': false, 'message': _getErrorMessage(e.code)};
     } catch (e) {
-      return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}'
+      };
     }
   }
 
@@ -195,7 +205,10 @@ class RecruiterAuthService {
     } on FirebaseAuthException catch (e) {
       return {'success': false, 'message': _getErrorMessage(e.code)};
     } catch (e) {
-      return {'success': false, 'message': 'An error occurred: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'An error occurred: ${e.toString()}'
+      };
     }
   }
 
@@ -207,7 +220,8 @@ class RecruiterAuthService {
   // Get Recruiter Data
   Future<RecruiterUser?> getRecruiterData(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(uid).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
         return RecruiterUser.fromFirestore(doc);
       }
@@ -280,11 +294,20 @@ class RecruiterFirestoreService {
       }
 
       await reqRef.set(doc);
-      return {'success': true, 'message': 'Request submitted — pending admin approvals.'};
+      return {
+        'success': true,
+        'message': 'Request submitted — pending admin approvals.'
+      };
     } on FirebaseException catch (e) {
-      return {'success': false, 'message': 'Error submitting request: ${e.message}'};
+      return {
+        'success': false,
+        'message': 'Error submitting request: ${e.message}'
+      };
     } catch (e) {
-      return {'success': false, 'message': 'Error submitting request: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'Error submitting request: ${e.toString()}'
+      };
     }
   }
 
@@ -296,19 +319,21 @@ class RecruiterFirestoreService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs
-          .map((doc) => JobPosting.fromFirestore(doc))
-          .toList();
+      return snapshot.docs.map((doc) => JobPosting.fromFirestore(doc)).toList();
     });
   }
 
   // Update Job
-  Future<Map<String, dynamic>> updateJob(String jobId, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateJob(
+      String jobId, Map<String, dynamic> data) async {
     try {
       await _firestore.collection('jobs').doc(jobId).update(data);
       return {'success': true, 'message': 'Job updated successfully!'};
     } catch (e) {
-      return {'success': false, 'message': 'Error updating job: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'Error updating job: ${e.toString()}'
+      };
     }
   }
 
@@ -318,7 +343,10 @@ class RecruiterFirestoreService {
       await _firestore.collection('jobs').doc(jobId).delete();
       return {'success': true, 'message': 'Job deleted successfully!'};
     } catch (e) {
-      return {'success': false, 'message': 'Error deleting job: ${e.toString()}'};
+      return {
+        'success': false,
+        'message': 'Error deleting job: ${e.toString()}'
+      };
     }
   }
 
@@ -380,14 +408,14 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
 
   Future<void> _loadRecruiterData() async {
     final user = _authService.currentUser;
-      if (user != null) {
-        final data = await _authService.getRecruiterData(user.uid);
-        final applicants = await _firestoreService.getTotalApplicants(user.uid);
-        setState(() {
-          _recruiterData = data;
-          _totalApplicants = applicants;
-        });
-      }
+    if (user != null) {
+      final data = await _authService.getRecruiterData(user.uid);
+      final applicants = await _firestoreService.getTotalApplicants(user.uid);
+      setState(() {
+        _recruiterData = data;
+        _totalApplicants = applicants;
+      });
+    }
   }
 
   void _showPostJobSheet() {
@@ -456,7 +484,8 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                 ),
               ),
               child: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                titlePadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -544,33 +573,59 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  // Pending Requests (if any)
+                  
+                  // Show all non-approved requests for this recruiter
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('job_requests')
                         .where('recruiterId', isEqualTo: user.uid)
-                        .where('status', isEqualTo: 'pending')
                         .orderBy('createdAt', descending: true)
                         .snapshots(),
                     builder: (context, snap) {
-                      if (!snap.hasData || snap.data!.docs.isEmpty) return const SizedBox.shrink();
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          const Text('Pending Requests', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          ...snap.data!.docs.map((d) {
-                            final Map jd = (d.data() as Map<String,dynamic>)['job'] ?? {};
-                            return Card(
-                              child: ListTile(
-                                title: Text(jd['title'] ?? 'Untitled'),
-                                subtitle: Text('Target: ${d['targetUniversity'] ?? 'N/A'}'),
-                                trailing: const Text('Pending', style: TextStyle(color: Colors.orange)),
-                              ),
-                            );
-                          }).toList(),
-                        ],
+                      if (!snap.hasData || snap.data!.docs.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // Filter out requests that have already been approved
+                      final docs = snap.data!.docs.where((d) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final status = (data['status'] ?? '') as String;
+                        return status.toLowerCase() != 'approved';
+                      }).toList();
+
+                      if (docs.isEmpty) return const SizedBox.shrink();
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0, vertical: 8.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('All Requests',
+                                style: TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 8),
+                            ...docs.map((d) {
+                              final data = d.data() as Map<String, dynamic>;
+                              return Card(
+                                child: ListTile(
+                                  title: Text((data['job']
+                                          as Map<String, dynamic>?)?['title'] ??
+                                      'Untitled'),
+                                  subtitle: Text(
+                                      'status: ${data['status'] ?? 'n/a'} • jobId: ${data['jobId'] ?? 'none'}'),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_forever,
+                                        color: Colors.red),
+                                    tooltip:
+                                        'Delete request (and job if created)',
+                                    onPressed: () => _deleteRequest(d.id),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -616,7 +671,16 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
 
                       if (snapshot.hasError) {
                         return Center(
-                          child: Text('Error: ${snapshot.error}'),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Text(
+                              'Error: ${snapshot.error}',
+                              textAlign: TextAlign.center,
+                              maxLines: 5,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.red[700]),
+                            ),
+                          ),
                         );
                       }
 
@@ -683,7 +747,8 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -750,7 +815,8 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Job'),
-        content: const Text('Are you sure you want to delete this job posting?'),
+        content:
+            const Text('Are you sure you want to delete this job posting?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -773,6 +839,49 @@ class _RecruiterAdminPanelState extends State<RecruiterAdminPanel> {
           backgroundColor: result['success'] ? Colors.green : Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _deleteRequest(String requestId) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Request'),
+        content: const Text(
+            'Delete this job request? This will also delete the created job if it exists.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+              style: TextButton.styleFrom(foregroundColor: Colors.red)),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final docRef =
+        FirebaseFirestore.instance.collection('job_requests').doc(requestId);
+    final snap = await docRef.get();
+    final data = snap.data() as Map<String, dynamic>?;
+    final jobId = data?['jobId'] as String?;
+
+    // Delete the request
+    await docRef.delete();
+
+    // If a job was created, delete it as well
+    if (jobId != null && jobId.isNotEmpty) {
+      final res = await _firestoreService.deleteJob(jobId);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(res['message'] + ' (also removed jobId: $jobId)'),
+        backgroundColor: res['success'] ? Colors.green : Colors.red,
+      ));
+    } else {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Request deleted')));
     }
   }
 
@@ -985,9 +1094,7 @@ class RecruiterJobCard extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: job.isRemote
-                      ? Colors.blue[50]
-                      : Colors.orange[50],
+                  color: job.isRemote ? Colors.blue[50] : Colors.orange[50],
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -1044,12 +1151,17 @@ class _PostJobBottomSheetState extends State<PostJobBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.existingJob?.title ?? '');
-    _salaryController = TextEditingController(text: widget.existingJob?.salary ?? '');
-    _descriptionController = TextEditingController(text: widget.existingJob?.description ?? '');
-    _requirementsController = TextEditingController(text: widget.existingJob?.requirements ?? '');
-    _locationController = TextEditingController(text: widget.existingJob?.location ?? 'Lahore/Islamabad');
-    
+    _titleController =
+        TextEditingController(text: widget.existingJob?.title ?? '');
+    _salaryController =
+        TextEditingController(text: widget.existingJob?.salary ?? '');
+    _descriptionController =
+        TextEditingController(text: widget.existingJob?.description ?? '');
+    _requirementsController =
+        TextEditingController(text: widget.existingJob?.requirements ?? '');
+    _locationController = TextEditingController(
+        text: widget.existingJob?.location ?? 'Lahore/Islamabad');
+
     if (widget.existingJob != null) {
       _selectedUniversity = widget.existingJob!.targetUniversity;
       _isRemote = widget.existingJob!.isRemote;
@@ -1112,9 +1224,11 @@ class _PostJobBottomSheetState extends State<PostJobBottomSheet> {
             children: const [
               Icon(Icons.hourglass_top, size: 48, color: Colors.deepPurple),
               SizedBox(height: 12),
-              Text('Your job request was submitted and is pending admin approval.'),
+              Text(
+                  'Your job request was submitted and is pending admin approval.'),
               SizedBox(height: 8),
-              Text('You will be notified when an admin approves it.', style: TextStyle(fontSize: 12)),
+              Text('You will be notified when an admin approves it.',
+                  style: TextStyle(fontSize: 12)),
             ],
           ),
           actions: [
@@ -1359,7 +1473,9 @@ class _PostJobBottomSheetState extends State<PostJobBottomSheet> {
                           ),
                         )
                       : Text(
-                          widget.existingJob != null ? 'Update Job' : 'Post Job',
+                          widget.existingJob != null
+                              ? 'Update Job'
+                              : 'Post Job',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -1428,6 +1544,87 @@ class JobApplicationsScreen extends StatelessWidget {
 
   JobApplicationsScreen({Key? key, required this.job}) : super(key: key);
 
+Future<void> _openResume(BuildContext context, String resumeUrl) async {
+    if (resumeUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No resume available')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (c) => ResumeViewerPage(resumeUrl: resumeUrl)),
+    );
+  }
+
+  Future<void> _downloadResume(BuildContext context, String resumeUrl, String userName) async {
+    if (resumeUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No resume available')),
+      );
+      return;
+    }
+
+    try {
+      // Clean filename
+      String filename = '${userName.replaceAll(RegExp(r'\s+'), '_')}_Resume.pdf';
+
+      if (resumeUrl.startsWith('data:application/pdf;base64,')) {
+        if (kIsWeb) {
+          await triggerDownload(resumeUrl, filename: filename);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Download started')));
+          }
+          return;
+        }
+
+        // Mobile: Write bytes to file
+        try {
+          final String base64Str = resumeUrl.split(',').last;
+          final Uint8List bytes = base64Decode(base64Str);
+
+          // Get directory (Documents directory is safe for app files)
+          final Directory dir = await getApplicationDocumentsDirectory();
+          final File file = File('${dir.path}/$filename');
+
+          await file.writeAsBytes(bytes);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Saved to ${file.path}'),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error saving file: $e')),
+            );
+          }
+        }
+      } else {
+        // Handle URL download if needed
+        final uri = Uri.parse(resumeUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not download resume URL')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error downloading resume: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1443,7 +1640,18 @@ class JobApplicationsScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Error: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.red[700]),
+                ),
+              ),
+            );
           }
 
           final applications = snapshot.data?.docs ?? [];
@@ -1494,12 +1702,33 @@ class JobApplicationsScreen extends StatelessWidget {
                       Text(app['university'] ?? ''),
                     ],
                   ),
-                  trailing: Chip(
-                    label: Text(
-                      app['status'] ?? 'pending',
-                      style: const TextStyle(fontSize: 12),
+                  trailing: SizedBox(
+                    width: 120,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // status badge removed per request
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'View resume',
+                          onPressed: () async {
+                            final url = (app['resumeUrl'] ?? '') as String;
+                            await _openResume(context, url);
+                          },
+                          icon: const Icon(Icons.visibility_outlined),
+                        ),
+                        IconButton(
+                          tooltip: 'Download resume',
+                          onPressed: () async {
+                            final url = (app['resumeUrl'] ?? '') as String;
+                            final name = (app['studentName'] ?? 'Student') as String;
+                            await _downloadResume(context, url, name);
+                          },
+                          icon: const Icon(Icons.download_outlined),
+                        ),
+                      ],
                     ),
-                    backgroundColor: Colors.orange[100],
                   ),
                 ),
               );
@@ -1510,4 +1739,3 @@ class JobApplicationsScreen extends StatelessWidget {
     );
   }
 }
-// Force update

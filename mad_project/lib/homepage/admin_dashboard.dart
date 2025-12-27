@@ -1740,7 +1740,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                     children: [
                       const Icon(Icons.error, color: Colors.red, size: 48),
                       const SizedBox(height: 8),
-                      Text('Failed to load users: ${snapshot.error}'),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Failed to load users: ${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: Colors.red[700]),
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: () async {

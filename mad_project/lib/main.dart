@@ -42,7 +42,8 @@ void main() async {
     }
   } catch (e, s) {
     final msg = e.toString();
-    if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
+    if (msg.contains('already exists') ||
+        msg.contains('firebase app') && msg.contains('already')) {
       // swallow duplicate initialization error
     } else {
       runApp(ErrorReportApp(exception: e, stack: s));
@@ -58,8 +59,10 @@ void main() async {
   }
 
   try {
-    final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
-    final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
+    final recruiterEmail =
+        Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
+    final recruiterPassword =
+        Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
     debugPrint('RECRUITER_ADMIN_CREDENTIALS:');
     debugPrint('  email: $recruiterEmail');
     debugPrint('  password: $recruiterPassword');
@@ -151,14 +154,14 @@ class UniversityApp extends StatelessWidget {
           getPages: [
             // Auth Routes
             GetPage(name: '/login', page: () => const LoginView()),
-            
+
             // Main Dashboard Routes
             GetPage(
                 name: '/dashboard',
                 page: () =>
                     const HomeDashboard()), 
             GetPage(name: '/admin', page: () => const AdminDashboard()),
-            
+
             // Feature Module Routes
             GetPage(
                 name: '/lost-and-found',
@@ -171,12 +174,17 @@ class UniversityApp extends StatelessWidget {
             
             // Complaints module
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
-            GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
-            GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
-            
+            GetPage(
+                name: '/complaints/create',
+                page: () => const CreateComplaintScreen()),
+            GetPage(
+                name: '/complaints/admin', page: () => AdminComplaintList()),
+
             // AI Study Planner module
-            GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
-            
+            GetPage(
+                name: '/ai-study-planner',
+                page: () => const StudyPlannerModule()),
+
             // Placement module (student & recruiter)
             GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
             GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
@@ -200,11 +208,11 @@ class UniversityApp extends StatelessWidget {
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     if (user != null) {
       return StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
