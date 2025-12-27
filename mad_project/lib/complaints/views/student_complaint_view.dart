@@ -251,6 +251,23 @@ class StudentComplaintView extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (complaint.isAnonymous) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: const [
+                          Icon(Icons.visibility_off, size: 14, color: Colors.grey),
+                          SizedBox(width: 6),
+                          Text(
+                            'Submitted anonymously',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     Row(
                       children: [

@@ -39,7 +39,11 @@ class ComplaintService {
         urgency: urgency,
         status: ComplaintStatus.pending,
         isAnonymous: isAnonymous,
-        studentId: isAnonymous ? _anonymousId : user.uid,
+        // Always record the submitting user's uid so the student can see
+        // their own complaint progress even when they choose to remain
+        // anonymous to admins. The `isAnonymous` flag controls whether
+        // display fields (like `studentName`) are populated.
+        studentId: user.uid,
         uniId: uniId,
         deptId: deptId,
         createdAt: DateTime.now(),
@@ -112,8 +116,11 @@ class ComplaintService {
       }
 
       // Rebuild complaint data to include optional display fields
+      // If the complaint was submitted anonymously, do not include
+      // the `studentName` field so admins see it as anonymous. Otherwise
+      // include the resolved `studentName` for admin context.
       final enriched = complaint.copyWith(
-        studentName: studentName,
+        studentName: isAnonymous ? null : studentName,
         uniName: uniName,
         deptName: deptName,
         sectionId: sectionId,
