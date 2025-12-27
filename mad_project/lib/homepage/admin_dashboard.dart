@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
+import '../student_marketplace.dart';
 import 'recruiter_requests_admin.dart';
 import 'admin_notifications.dart';
 import '../lost_and_found_admin.dart';
@@ -222,7 +223,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           _buildUserManager(),
           if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
             AdminComplaintList(adminViewUniId: selectedUni),
-          if (isSuperAdmin || isUniversityAdmin) const MarketplaceAdminList(),
+          if (isSuperAdmin)
+            const MarketplaceAdminList()
+          else if (isUniversityAdmin)
+            // University admin sees only their university marketplace
+            StudentMarketplace(adminViewUniId: selectedUni),
           if (isSuperAdmin || isUniversityAdmin)
             LostAndFoundAdminList(adminViewUniId: selectedUni),
         ],

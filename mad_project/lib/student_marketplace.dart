@@ -294,9 +294,27 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
     _resolveUniId();
   }
 
+  @override
+  void didUpdateWidget(covariant StudentMarketplace oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the parent supplies a different adminViewUniId after mount,
+    // update the resolved uni id so the stream switches from global
+    // to the specific university immediately.
+    if (widget.adminViewUniId != oldWidget.adminViewUniId) {
+      setState(() {
+        _resolvedUniId = widget.adminViewUniId;
+      });
+    }
+  }
+
   Future<void> _resolveUniId() async {
-    // If adminViewUniId is provided, use it as the resolved uni but
-    // still load the current user's id and role so admin UI is shown.
+    // If `adminViewUniId` was passed, set it immediately so the UI
+    // shows the university-scoped marketplace while we resolve the
+    // current user's profile asynchronously.
+    if (widget.adminViewUniId != null && widget.adminViewUniId!.isNotEmpty) {
+      _resolvedUniId = widget.adminViewUniId;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() {
