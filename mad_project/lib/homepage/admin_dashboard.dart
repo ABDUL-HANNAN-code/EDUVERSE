@@ -301,17 +301,19 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              // If there's no back stack, send user to the main dashboard
-              Get.offAllNamed('/dashboard');
-            }
-          },
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              )
+            : Builder(
+                builder: (ctx) => IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

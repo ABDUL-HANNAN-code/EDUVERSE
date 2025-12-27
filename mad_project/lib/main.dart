@@ -199,14 +199,15 @@ class AuthGate extends StatelessWidget {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           final role = userData?['role'] ?? 'student';
 
-          // Route based on role
-          if (role == 'faculty') return const FacultyDashboardScreen();
-          if (role == 'recruiter') return const RecruiterAdminPanel();
-          if (role == 'admin') return const AdminDashboard();
-          
-          return user.emailVerified 
-              ? const HomeDashboard() 
-              : const VerifyEmailView();
+            // Route based on role
+            if (role == 'faculty') return const FacultyDashboardScreen();
+            if (role == 'recruiter') return const RecruiterAdminPanel();
+            // Keep super_admin on AdminDashboard; route regular university admins
+            // to the main HomeDashboard by default.
+            if (role == 'super_admin') return const AdminDashboard();
+            if (role == 'admin') return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
+
+            return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
         }
       );
     }
