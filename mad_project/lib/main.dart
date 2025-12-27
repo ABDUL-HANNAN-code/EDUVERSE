@@ -195,11 +195,19 @@ class AuthGate extends StatelessWidget {
           // Route based on role
           if (role == 'faculty') return const FacultyDashboardScreen();
           if (role == 'recruiter') return const RecruiterAdminPanel();
-          if (role == 'admin') return const AdminDashboard();
-          
-          return user.emailVerified 
-              ? const HomeDashboard() 
-              : const VerifyEmailView();
+
+          if (role == 'admin') {
+            // Decide admin landing based on adminScope: department admins should see AdminDashboard,
+            // university-level admins should land on the regular HomeDashboard.
+            final adminScope = userData?['adminScope'];
+            if (adminScope is Map && adminScope['deptId'] != null) {
+              return const AdminDashboard();
+            }
+            // University-level admin (no deptId) — open HomeDashboard instead of Admin panel
+            return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
+          }
+
+          return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
         }
       );
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
@@ -28,6 +29,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
   List<Map<String, dynamic>> sections = [];
   bool isLoading = true;
   String selectedDay = 'Monday';
+  bool _showGridLayout = false;
 
   final List<String> days = [
     'Monday',
@@ -434,6 +436,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
         backgroundColor: isSuperAdmin ? Colors.purple : AppColors.mainColor,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: Icon(_showGridLayout ? Icons.view_list : Icons.grid_on),
+            tooltip: 'Toggle timetable layout',
+            onPressed: () => setState(() => _showGridLayout = !_showGridLayout),
+          ),
           if (isAdmin)
             IconButton(
               icon: const Icon(Icons.admin_panel_settings),
@@ -446,11 +453,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
       ),
       body: Column(
         children: [
-          // Day Selector
-          _buildDaySelector(),
+          // Day Selector (hidden in grid layout to avoid duplicate day headers)
+          if (!_showGridLayout) _buildDaySelector(),
 
-          // Timetable Content
-          Expanded(child: _buildTimetableContent()),
+          // Timetable Content (list or read-only grid)
+          Expanded(child: _showGridLayout ? _buildReadOnlyGridView() : _buildTimetableContent()),
         ],
       ),
     );
@@ -582,14 +589,14 @@ class _TimetableScreenState extends State<TimetableScreen> {
           Column(
             children: [
               Text(
-                data['start'],
+                _formatTime12(data['start'] ?? ''),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
               ),
               Text(
-                data['end'],
+                _formatTime12(data['end'] ?? ''),
                 style: const TextStyle(
                   color: Colors.grey,
                   fontSize: 12,
@@ -636,5 +643,325 @@ class _TimetableScreenState extends State<TimetableScreen> {
         ],
       ),
     );
+  }
+
+  // Read-only grid view similar to admin layout but non-editable
+  Widget _buildReadOnlyGridView() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _service.getAdminTimetableStream(
+        uniId: uniId!,
+        deptId: deptId,
+        sectionId: sectionId,
+        shift: shift,
+        semester: semester,
+      ),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        final docs = snapshot.data!.docs;
+        // build map by cell
+        final timeSlots = _getTimeSlots(shift ?? 'morning');
+        final Map<String, List<QueryDocumentSnapshot>> classesByCell = {};
+        for (var doc in docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final day = data['day'] as String? ?? '';
+          final startTime = data['start'] as String? ?? '';
+          final key = '$day-$startTime';
+          classesByCell.putIfAbsent(key, () => []).add(doc);
+        }
+
+        // Use LayoutBuilder to compute available width and avoid RenderFlex overflow
+        const headerHeight = 56.0;
+        final cellHeight = 80.0;
+
+        return LayoutBuilder(builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+          var timeColumnWidth = 72.0;
+          // ensure time column leaves reasonable room
+          if (screenWidth < 360) timeColumnWidth = 56.0;
+
+          final available = (screenWidth - timeColumnWidth).clamp(0.0, double.infinity);
+          final cellWidth = (available / days.length);
+          // For horizontal layout (days in sidebar, times on top), compute sizes
+          // cellWidth will now represent width per time slot, and rowHeight per day
+          final screenHeight = MediaQuery.of(context).size.height - 160; // approximate available height
+          final rowHeight = math.max(56.0, (screenHeight - headerHeight) / days.length);
+          final timeSlotCount = timeSlots.length;
+          final slotWidth = math.max(120.0, (available / math.max(1, timeSlotCount)));
+
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: RotatedBox(
+              quarterTurns: 1,
+              child: SizedBox(
+                width: timeColumnWidth + slotWidth * timeSlotCount,
+                height: headerHeight + rowHeight * days.length,
+                child: Stack(
+                  children: [
+                    _buildGridSkeletonHorizontal(timeSlots, slotWidth, rowHeight, headerHeight, timeColumnWidth),
+                    ..._buildClassOverlaysGroupedReadOnlyHorizontal(classesByCell, timeSlots, slotWidth, rowHeight, headerHeight, timeColumnWidth),
+                  ],
+                ),
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildGridSkeletonHorizontal(
+    List<Map<String, String>> timeSlots,
+    double slotWidth,
+    double rowHeight,
+    double headerHeight,
+    double dayColumnWidth,
+  ) {
+    return Column(
+      children: [
+        // Top header row: empty corner + time headers
+        Row(
+          children: [
+            Container(
+              width: dayColumnWidth,
+              height: headerHeight,
+              decoration: BoxDecoration(color: AppColors.mainColor, border: Border.all(color: Colors.white, width: 1)),
+              child: const Center(child: Text('Days', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+            ),
+            ...timeSlots.map((slot) => Container(
+                  width: slotWidth,
+                  height: headerHeight,
+                  decoration: BoxDecoration(color: AppColors.mainColor, border: Border.all(color: Colors.white, width: 1)),
+                  child: Center(child: Text('${_formatTime12(slot['start'] ?? '')}\n${_formatTime12(slot['end'] ?? '')}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11))),
+                )),
+          ],
+        ),
+        // Rows per day
+        ...days.map((day) {
+          return Row(
+            children: [
+              Container(
+                width: dayColumnWidth,
+                height: rowHeight,
+                decoration: BoxDecoration(color: Colors.grey.shade100, border: Border.all(color: Colors.grey.shade300, width: 1)),
+                child: Center(child: Text(day, style: const TextStyle(fontWeight: FontWeight.bold))),
+              ),
+              ...timeSlots.map((_) => Container(width: slotWidth, height: rowHeight, decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300, width: 1)), child: const SizedBox.shrink())),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  List<Widget> _buildClassOverlaysGroupedReadOnlyHorizontal(
+    Map<String, List<QueryDocumentSnapshot>> classesByCell,
+    List<Map<String, String>> timeSlots,
+    double slotWidth,
+    double rowHeight,
+    double headerHeight,
+    double dayColumnWidth,
+  ) {
+    const slotDuration = 80;
+    final overlays = <Widget>[];
+
+    classesByCell.forEach((cellKey, cellDocs) {
+      if (cellDocs.isEmpty) return;
+      final firstData = cellDocs.first.data() as Map<String, dynamic>;
+      final day = firstData['day'] as String? ?? '';
+      final dayIndex = days.indexOf(day);
+      if (dayIndex == -1) return;
+
+      final startTime = firstData['start'] as String? ?? '';
+      final startMin = _timeToMinutes(startTime);
+      final firstSlotStart = _timeToMinutes(timeSlots.first['start']!);
+      final minutesFromFirstSlot = startMin - firstSlotStart;
+
+      final cellTop = headerHeight + (dayIndex * rowHeight);
+      final cellLeft = dayColumnWidth + (minutesFromFirstSlot / slotDuration) * slotWidth;
+
+      final classCount = cellDocs.length;
+      final classWidth = math.max((slotWidth - 8) / classCount, 100.0);
+
+      for (var i = 0; i < cellDocs.length; i++) {
+        final doc = cellDocs[i];
+        final data = doc.data() as Map<String, dynamic>;
+        final endTime = data['end'] as String? ?? '';
+        final endMin = _timeToMinutes(endTime);
+        final duration = endMin - startMin;
+        final classWidthPx = classWidth;
+        final classHeight = math.max((duration / slotDuration) * rowHeight, 48.0);
+
+        overlays.add(Positioned(
+          top: cellTop + 4,
+          left: cellLeft + 4 + (i * classWidthPx),
+          width: classWidthPx - 4,
+          height: classHeight - 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(color: Color(data['colorValue'] ?? 0xFF3498DB), borderRadius: BorderRadius.circular(6)),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(data['subject'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text('${_formatTime12(data['start'] ?? '')}', style: const TextStyle(color: Colors.white70, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(data['teacher'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ]),
+          ),
+        ));
+      }
+    });
+
+    return overlays;
+  }
+
+  Widget _buildGridSkeleton(
+    List<Map<String, String>> timeSlots,
+    double cellWidth,
+    double cellHeight,
+    double headerHeight,
+    double timeColumnWidth,
+  ) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: timeColumnWidth,
+              height: headerHeight,
+              decoration: BoxDecoration(
+                color: AppColors.mainColor,
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: const Center(
+                child: Text('Time', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            ...days.map((day) => Container(
+                  width: cellWidth,
+                  height: headerHeight,
+                  decoration: BoxDecoration(color: AppColors.mainColor, border: Border.all(color: Colors.white, width: 1)),
+                  child: Center(child: Text(day, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                )),
+          ],
+        ),
+        ...timeSlots.map((slot) {
+          return Row(
+            children: [
+              Container(
+                width: timeColumnWidth,
+                height: cellHeight,
+                decoration: BoxDecoration(color: Colors.grey.shade100, border: Border.all(color: Colors.grey.shade300, width: 1)),
+                child: Center(child: Text('${_formatTime12(slot['start'] ?? '')}\n${_formatTime12(slot['end'] ?? '')}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+              ),
+              ...days.map((day) => Container(width: cellWidth, height: cellHeight, decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300, width: 1)), child: const SizedBox.shrink())),
+            ],
+          );
+        }),
+      ],
+    );
+  }
+
+  List<Widget> _buildClassOverlaysGroupedReadOnly(
+    Map<String, List<QueryDocumentSnapshot>> classesByCell,
+    List<Map<String, String>> timeSlots,
+    double cellWidth,
+    double cellHeight,
+    double headerHeight,
+    double timeColumnWidth,
+  ) {
+    const slotDuration = 80;
+    final overlays = <Widget>[];
+
+    classesByCell.forEach((cellKey, cellDocs) {
+      if (cellDocs.isEmpty) return;
+      final firstData = cellDocs.first.data() as Map<String, dynamic>;
+      final day = firstData['day'] as String? ?? '';
+      final dayIndex = days.indexOf(day);
+      if (dayIndex == -1) return;
+
+      final startTime = firstData['start'] as String? ?? '';
+      final startMin = _timeToMinutes(startTime);
+      final firstSlotStart = _timeToMinutes(timeSlots.first['start']!);
+      final minutesFromFirstSlot = startMin - firstSlotStart;
+
+      final cellTop = headerHeight + (minutesFromFirstSlot / slotDuration) * cellHeight;
+      final cellLeft = timeColumnWidth + (dayIndex * cellWidth);
+
+      final classCount = cellDocs.length;
+      final classWidth = math.max((cellWidth - 8) / classCount, 64.0);
+
+      for (var i = 0; i < cellDocs.length; i++) {
+        final doc = cellDocs[i];
+        final data = doc.data() as Map<String, dynamic>;
+        final endTime = data['end'] as String? ?? '';
+        final endMin = _timeToMinutes(endTime);
+        final duration = endMin - startMin;
+        final classHeight = math.max((duration / slotDuration) * cellHeight, 52.0);
+
+        overlays.add(Positioned(
+          top: cellTop,
+          left: cellLeft + 4 + (i * classWidth),
+          width: classWidth - 4,
+          height: classHeight - 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(color: Color(data['colorValue'] ?? 0xFF3498DB), borderRadius: BorderRadius.circular(6)),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(data['subject'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text('${_formatTime12(data['start'] ?? '')} - ${_formatTime12(data['end'] ?? '')}', style: const TextStyle(color: Colors.white70, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
+              Text(data['teacher'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 1),
+              Text(data['sectionId'] ?? data['location'] ?? '', style: const TextStyle(color: Colors.white70, fontSize: 8), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ]),
+          ),
+        ));
+      }
+    });
+
+    return overlays;
+  }
+
+  // Time helpers (copy of admin formatting utilities)
+  List<Map<String, String>> _getTimeSlots(String shift) {
+    if (shift == 'morning') {
+      return [
+        {'start': '08:00', 'end': '09:20'},
+        {'start': '09:20', 'end': '10:40'},
+        {'start': '10:40', 'end': '12:00'},
+        {'start': '12:00', 'end': '13:20'},
+        {'start': '13:20', 'end': '14:40'},
+      ];
+    } else {
+      return [
+        {'start': '14:40', 'end': '16:00'},
+        {'start': '16:00', 'end': '17:20'},
+        {'start': '17:20', 'end': '18:40'},
+        {'start': '18:40', 'end': '20:00'},
+        {'start': '20:00', 'end': '21:20'},
+      ];
+    }
+  }
+
+  int _timeToMinutes(String time) {
+    if (!time.contains(':')) return 0;
+    final parts = time.split(':');
+    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+  }
+
+  String _formatTime12(String t24) {
+    try {
+      final parts = t24.split(':');
+      var h = int.parse(parts[0]);
+      final m = parts.length > 1 ? parts[1] : '00';
+      final suffix = h < 12 ? 'AM' : 'PM';
+      final displayH = (h % 12 == 0) ? 12 : (h % 12);
+      return '$displayH:$m $suffix';
+    } catch (_) {
+      return t24;
+    }
   }
 }

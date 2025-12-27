@@ -295,6 +295,7 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return Scaffold(
       appBar: AppBar(
+        leading: Navigator.canPop(context) ? const BackButton() : null,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1114,7 +1115,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
             const SizedBox(height: 2),
             Text(
-              '${data['start']} - ${data['end']}',
+              '${_formatTime12(data['start'] ?? '')} - ${_formatTime12(data['end'] ?? '')}',
               style: TextStyle(color: textColor.withOpacity(0.85), fontSize: 8),
             ),
             Text(
@@ -1364,7 +1365,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             _buildDetailRow('Day', data['day'] ?? ''),
             _buildDetailRow(
               'Time',
-              '${data['start'] ?? ''} - ${data['end'] ?? ''}',
+              '${_formatTime12(data['start'] ?? '')} - ${_formatTime12(data['end'] ?? '')}',
             ),
             _buildDetailRow('Room', data['location'] ?? ''),
             _buildDetailRow('Teacher', data['teacher'] ?? ''),
