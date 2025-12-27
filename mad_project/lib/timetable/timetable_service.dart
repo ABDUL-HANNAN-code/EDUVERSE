@@ -6,9 +6,17 @@ class TimetableService {
 
   /// Standardizes time to comparable integers (e.g., "08:30" -> 510 minutes)
   int _timeToMinutes(String time) {
-    if (!time.contains(':')) return 0;
-    final parts = time.split(':');
-    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+    try {
+      final match = RegExp(r"(\d{1,2}:\d{2})").firstMatch(time);
+      final normalized = match != null ? match.group(1)! : time;
+      if (!normalized.contains(':')) return 0;
+      final parts = normalized.split(':');
+      final h = int.tryParse(parts[0].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      final m = int.tryParse(parts[1].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      return h * 60 + m;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Converts minutes back to HH:MM format
@@ -212,10 +220,8 @@ class TimetableService {
     String? shift,
     String? semester,
   }) {
-    Query query = _db
-        .collection('universities')
-        .doc(uniId)
-        .collection('timetables');
+    Query query =
+        _db.collection('universities').doc(uniId).collection('timetables');
 
     if (deptId != null && deptId.isNotEmpty) {
       query = query.where('departmentId', isEqualTo: deptId);
@@ -549,10 +555,8 @@ class TimetableService {
     int totalTeachers = 0;
 
     // Count classes
-    Query classQuery = _db
-        .collection('universities')
-        .doc(uniId)
-        .collection('timetables');
+    Query classQuery =
+        _db.collection('universities').doc(uniId).collection('timetables');
 
     if (deptId != null && deptId.isNotEmpty) {
       classQuery = classQuery.where('departmentId', isEqualTo: deptId);

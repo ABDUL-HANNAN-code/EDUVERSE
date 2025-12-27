@@ -229,32 +229,21 @@ class _AdminDashboardState extends State<AdminDashboard>
           Get.back(); // Close input dialog
 
           // --- 3. IMPLICITLY OPEN EMAIL APP ---
-<<<<<<< HEAD
-          final String subject =
-              Uri.encodeComponent("Faculty Connect Invitation");
-          final String body = Uri.encodeComponent(
-              "Hello,\n\nYou have been invited to join as Faculty.\n\nPlease use the following Invitation Code to register:\n$code\n\nRegards,\nAdmin");
-          final Uri mailUri =
-              Uri.parse("mailto:$email?subject=$subject&body=$body");
-=======
           // Creates a mailto link with subject and body pre-filled
           final String subject = Uri.encodeComponent("Faculty Invitation Code");
           final String body = Uri.encodeComponent(
               "Hello,\n\nYou have been invited to join the faculty.\n\nYour invitation code is:\n$code\n\nPlease use this code to register.\n\nRegards,\nAdmin");
-          
-          final Uri mailUri = Uri.parse("mailto:$email?subject=$subject&body=$body");
->>>>>>> 33202b80f71848ab788679bd5df729812f458db9
+
+          final Uri mailUri =
+              Uri.parse("mailto:$email?subject=$subject&body=$body");
 
           try {
             await launchUrl(mailUri);
           } catch (e) {
             debugPrint("Could not launch email app: $e");
-<<<<<<< HEAD
-            Get.snackbar("Info", "Could not open email app automatically.",
+            Get.snackbar("Info",
+                "Could not open email app automatically. Please copy the code.",
                 backgroundColor: Colors.orange.shade100);
-=======
-            Get.snackbar("Info", "Could not open email app automatically. Please copy the code.", backgroundColor: Colors.orange.shade100);
->>>>>>> 33202b80f71848ab788679bd5df729812f458db9
           }
           // ------------------------------------
 
@@ -689,19 +678,17 @@ class _AdminDashboardState extends State<AdminDashboard>
               onTap: () {
                 if (selectedUni == null) {
                   Get.back(); // close drawer
-                  Get.snackbar(
-                    "Context Required", 
-                    "Please select a University from the dropdown above to manage its announcements.",
-                    backgroundColor: Colors.orange.shade100,
-                    duration: const Duration(seconds: 4)
-                  );
+                  Get.snackbar("Context Required",
+                      "Please select a University from the dropdown above to manage its announcements.",
+                      backgroundColor: Colors.orange.shade100,
+                      duration: const Duration(seconds: 4));
                   return;
                 }
                 Navigator.pop(context); // Close drawer
                 Get.to(() => AdminAnnouncementView(
-                  uniId: selectedUni!, 
-                  adminName: userName,
-                ));
+                      uniId: selectedUni!,
+                      adminName: userName,
+                    ));
               },
             ),
           ],
@@ -831,8 +818,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         }
       }
 
-      final key = matchedSlotStart != null ? '$day-$matchedSlotStart' : '$day-$startTime';
-      classesByCell.putIfAbsent(key, () => []).add(doc);
+        final normalizedKey = '$day-${_normalizeToHHMM(matchedSlotStart ?? startTime)}';
+        classesByCell.putIfAbsent(normalizedKey, () => []).add(doc);
     }
 
     return SizedBox(
@@ -2640,9 +2627,31 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   int _timeToMinutes(String time) {
-    if (!time.contains(':')) return 0;
-    final parts = time.split(':');
-    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+    try {
+      final match = RegExp(r"(\d{1,2}:\d{2})").firstMatch(time);
+      final normalized = match != null ? match.group(1)! : time;
+      if (!normalized.contains(':')) return 0;
+      final parts = normalized.split(':');
+      final h = int.tryParse(parts[0].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      final m = int.tryParse(parts[1].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      return h * 60 + m;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _normalizeToHHMM(String time) {
+    try {
+      final match = RegExp(r"(\d{1,2}:\d{2})").firstMatch(time);
+      final normalized = match != null ? match.group(1)! : time;
+      if (!normalized.contains(':')) return '00:00';
+      final parts = normalized.split(':');
+      final h = int.tryParse(parts[0].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      final m = int.tryParse(parts[1].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '00:00';
+    }
   }
 
   String _calculateEndTime(String startTime, bool isLab) {

@@ -675,8 +675,8 @@ class _TimetableScreenState extends State<TimetableScreen> {
             }
           }
 
-          final key = matchedSlotStart != null ? '$day-$matchedSlotStart' : '$day-$startTime';
-          classesByCell.putIfAbsent(key, () => []).add(doc);
+            final normalizedKey = '$day-${_normalizeToHHMM(matchedSlotStart ?? startTime)}';
+            classesByCell.putIfAbsent(normalizedKey, () => []).add(doc);
         }
 
         return LayoutBuilder(
@@ -766,7 +766,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
                             // Class cells for each time slot
                             ...timeSlots.map((slot) {
-                              final cellKey = '$day-${slot['start']}';
+                              final cellKey = '$day-${_normalizeToHHMM(slot['start']!)}';
                               final cellDocs = classesByCell[cellKey] ?? [];
 
                               return SizedBox(
@@ -883,6 +883,29 @@ class _TimetableScreenState extends State<TimetableScreen> {
         {'start': '20:00', 'end': '21:20'},
       ];
     }
+  }
+
+  int _timeToMinutes(String time) {
+    try {
+      final match = RegExp(r"(\d{1,2}:\d{2})").firstMatch(time);
+      final normalized = match != null ? match.group(1)! : time;
+      if (!normalized.contains(':')) return 0;
+      final parts = normalized.split(':');
+      final h = int.tryParse(parts[0].replaceAll(RegExp(r'\D'), '')) ?? 0;
+      final m = parts.length > 1
+          ? int.tryParse(parts[1].replaceAll(RegExp(r'\D'), '')) ?? 0
+          : 0;
+      return h * 60 + m;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _normalizeToHHMM(String time) {
+    final mins = _timeToMinutes(time);
+    final h = (mins ~/ 60).toString().padLeft(2, '0');
+    final m = (mins % 60).toString().padLeft(2, '0');
+    return '$h:$m';
   }
 
   String _formatTime12(String t24) {
