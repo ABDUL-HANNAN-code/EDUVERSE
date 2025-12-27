@@ -14,26 +14,28 @@ import 'complaints/views/student_complaint_view.dart';
 import 'complaints/views/create_complaint_screen.dart';
 import 'complaints/views/admin_complaint_list.dart';
 
-import 'shared.dart'; // Import Shared components
-import 'auth.dart'; // Import Auth logic
-import 'lost_and_found.dart'; // Import the Module
-import 'timetable/index.dart'; // Import Timetable Module
-import 'homepage/index.dart'; // Import Home Dashboard Module
+import 'shared.dart'; 
+import 'auth.dart'; 
+import 'lost_and_found.dart'; 
+import 'timetable/index.dart'; 
+import 'homepage/index.dart'; 
 import 'homepage/admin_dashboard.dart';
+
 // AI Study Planner module
 import 'ai_study_planner/ai_study_planner.dart';
-// Placement module (student & recruiter)
+
+// Placement module
 import 'timetable/placements/student_placement_screen.dart';
 import 'timetable/placements/recruiter_admin_panel.dart';
 
-// --- FIXED IMPORT PATH HERE ---
-import 'timetable/FACULTY/faculty_dashboard.dart';
-// Faculty Connect (student-facing module)
+// FACULTY DASHBOARD IMPORT (Preserved from your local changes)
+import 'timetable/FACULTY/faculty_dashboard.dart'; 
 import 'timetable/FACULTY/student_connect.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase with error handling
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
@@ -42,8 +44,7 @@ void main() async {
     }
   } catch (e, s) {
     final msg = e.toString();
-    if (msg.contains('already exists') ||
-        msg.contains('firebase app') && msg.contains('already')) {
+    if (msg.contains('already exists') || msg.contains('firebase app') && msg.contains('already')) {
       // swallow duplicate initialization error
     } else {
       runApp(ErrorReportApp(exception: e, stack: s));
@@ -51,24 +52,19 @@ void main() async {
     }
   }
   
+  // Disable persistence for web compatibility
   try {
-    FirebaseFirestore.instance.settings =
-        const Settings(persistenceEnabled: false);
-  } catch (e) {
-    // ignore errors applying settings in non-web platforms
-  }
+    FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
+  } catch (e) {}
 
+  // Log recruiter creds if available (Debug only)
   try {
-    final recruiterEmail =
-        Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
-    final recruiterPassword =
-        Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
+    final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
+    final recruiterPassword = Platform.environment['RECRUITER_ADMIN_PASSWORD'] ?? 'Recruiter123!';
     debugPrint('RECRUITER_ADMIN_CREDENTIALS:');
     debugPrint('  email: $recruiterEmail');
     debugPrint('  password: $recruiterPassword');
-  } catch (_) {
-    // Platform.environment may not be available on all targets; ignore.
-  }
+  } catch (_) {}
   
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
@@ -85,8 +81,7 @@ void main() async {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('An error occurred',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Text(details.exceptionAsString()),
                 const SizedBox(height: 12),
@@ -105,8 +100,7 @@ void main() async {
 class ErrorReportApp extends StatelessWidget {
   final Object exception;
   final StackTrace stack;
-  const ErrorReportApp(
-      {super.key, required this.exception, required this.stack});
+  const ErrorReportApp({super.key, required this.exception, required this.stack});
 
   @override
   Widget build(BuildContext context) {
@@ -121,8 +115,7 @@ class ErrorReportApp extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Firebase initialization failed',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Text(exception.toString()),
                 const SizedBox(height: 12),
@@ -147,58 +140,30 @@ class UniversityApp extends StatelessWidget {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Eduverse',
+          // Kept 'Inter' from your local config. Change to 'Poppins' if you prefer the remote style.
           theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Inter'),
 
           home: const AuthGate(),
 
           getPages: [
-            // Auth Routes
             GetPage(name: '/login', page: () => const LoginView()),
-
-            // Main Dashboard Routes
-            GetPage(
-                name: '/dashboard',
-                page: () =>
-                    const HomeDashboard()), 
+            GetPage(name: '/dashboard', page: () => const HomeDashboard()), 
             GetPage(name: '/admin', page: () => const AdminDashboard()),
-
-            // Feature Module Routes
-            GetPage(
-                name: '/lost-and-found',
-                page: () =>
-                    const LostAndFoundLandingPage()), 
-            GetPage(
-                name: '/timetable',
-                page: () => const TimetableScreen()), 
+            GetPage(name: '/lost-and-found', page: () => const LostAndFoundLandingPage()), 
+            GetPage(name: '/timetable', page: () => const TimetableScreen()), 
             GetPage(name: '/marketplace', page: () => const StudentMarketplace()),
-            
-            // Complaints module
             GetPage(name: '/complaints', page: () => StudentComplaintView()),
-            GetPage(
-                name: '/complaints/create',
-                page: () => const CreateComplaintScreen()),
-            GetPage(
-                name: '/complaints/admin', page: () => AdminComplaintList()),
-
-            // AI Study Planner module
-            GetPage(
-                name: '/ai-study-planner',
-                page: () => const StudyPlannerModule()),
-
-            // Placement module (student & recruiter)
+            GetPage(name: '/complaints/create', page: () => const CreateComplaintScreen()),
+            GetPage(name: '/complaints/admin', page: () => AdminComplaintList()),
+            GetPage(name: '/ai-study-planner', page: () => const StudyPlannerModule()),
+            
+            // Placement module
             GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
             GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
 
-            // === FACULTY MODULE ROUTE ===
-            GetPage(
-              name: '/faculty-dashboard', 
-              page: () => const FacultyDashboardScreen()
-            ),
-            // Student-facing Faculty Connect (directory + booking)
-            GetPage(
-              name: '/faculty-connect',
-              page: () => const MainNavigationScreen(),
-            ),
+            // Faculty Module (Preserved)
+            GetPage(name: '/faculty-dashboard', page: () => const FacultyDashboardScreen()),
+            GetPage(name: '/faculty-connect', page: () => const MainNavigationScreen()),
           ],
         );
       },
@@ -206,13 +171,14 @@ class UniversityApp extends StatelessWidget {
   }
 }
 
+// AuthGate with Role-Based Routing (Preserved)
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
-
+  
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-
+    
     if (user != null) {
       return StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
@@ -222,6 +188,7 @@ class AuthGate extends StatelessWidget {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           final role = userData?['role'] ?? 'student';
 
+          // Route based on role
           if (role == 'faculty') return const FacultyDashboardScreen();
           if (role == 'recruiter') return const RecruiterAdminPanel();
           if (role == 'admin') return const AdminDashboard();

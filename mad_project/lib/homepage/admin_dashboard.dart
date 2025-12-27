@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../shared.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
+import '../student_marketplace.dart';
 import 'recruiter_requests_admin.dart';
 import 'admin_notifications.dart';
 import '../lost_and_found_admin.dart';
@@ -65,10 +66,11 @@ class _AdminDashboardState extends State<AdminDashboard>
     _loadAdminProfile();
   }
 
-  // Wrap Firestore snapshots with error handling
+  // Wrap Firestore snapshots with error handling (Merged from collaborator file)
   Stream<QuerySnapshot> _safeCollectionStream(CollectionReference col) {
     try {
       return col.snapshots().handleError((e, st) {
+        // Log for diagnostics; do not rethrow to avoid breaking StreamBuilder
         debugPrint('Firestore stream error: $e');
       }, test: (_) => true);
     } catch (e) {
@@ -168,7 +170,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   // ==========================================
-  // FIXED GENERATE INVITE DIALOG
+  // FACULTY CONNECT / INVITE DIALOG
   // ==========================================
   void _showGenerateInviteDialog() {
     // 1. Validation: Ensure we know which university this admin belongs to
@@ -215,8 +217,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         }
 
         try {
-          // 2. CALL AUTH SERVICE DIRECTLY (No Cloud Functions)
-          // This generates the code and writes to Firestore 'invites' collection
+          // 2. CALL AUTH SERVICE DIRECTLY
           final String code = await AuthService().generateFacultyInvite(
             facultyEmail: email,
             uniId: selectedUni!, 
@@ -308,7 +309,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               icon: const Icon(Icons.settings),
               onPressed: _showWizardMenu,
             ),
-          // THIS IS THE BUTTON YOU CLICKED (Now linked to fixed function)
+          // Invite Button (Preserved from your file)
           if (!isSuperAdmin && (isUniversityAdmin || isDepartmentAdmin))
             IconButton(
               icon: const Icon(Icons.person_add_alt_1),
@@ -344,7 +345,11 @@ class _AdminDashboardState extends State<AdminDashboard>
           _buildUserManager(),
           if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
             AdminComplaintList(adminViewUniId: selectedUni),
-          if (isSuperAdmin || isUniversityAdmin) const MarketplaceAdminList(),
+          if (isSuperAdmin)
+            const MarketplaceAdminList()
+          else if (isUniversityAdmin)
+            // University admin sees only their university marketplace
+            StudentMarketplace(adminViewUniId: selectedUni),
           if (isSuperAdmin || isUniversityAdmin)
             LostAndFoundAdminList(adminViewUniId: selectedUni),
         ],
@@ -479,6 +484,17 @@ class _AdminDashboardState extends State<AdminDashboard>
               onTap: () {
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => AdminNotifications(adminUniId: isUniversityAdmin ? selectedUni : null)));
+              },
+            ),
+            // MERGED: Recruiter Requests from collaborator file
+            ListTile(
+              leading: const Icon(Icons.work_outline),
+              title: const Text('Recruiter Requests'),
+              subtitle: const Text('Approve or review recruiter job requests'),
+              onTap: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => RecruiterRequestsAdmin(
+                        adminUniId: isUniversityAdmin ? selectedUni : null)));
               },
             ),
           ],

@@ -160,6 +160,9 @@ class ComplaintController extends GetxController {
     }
 
     try {
+      // capture anonymity choice so we can inform the student after submit
+      final bool wasAnonymous = isAnonymous.value;
+
       isLoading.value = true;
 
       await _service.submitComplaint(
@@ -192,6 +195,21 @@ class ComplaintController extends GetxController {
       );
 
       await loadStatistics();
+
+      // If the student submitted anonymously, show a brief confirmation
+      // dialog clarifying that admins will see the complaint as anonymous
+      // but the student can still track progress in their view.
+      if (wasAnonymous) {
+        // small delay to ensure previous navigation/dialogs settled
+        await Future.delayed(const Duration(milliseconds: 150));
+        Get.defaultDialog(
+          title: 'Submitted Anonymously',
+          middleText:
+              'Your report was submitted anonymously to admins. Only you can track its progress in My Reports.',
+          textConfirm: 'OK',
+          onConfirm: () => Get.back(),
+        );
+      }
     } catch (e) {
       isLoading.value = false;
       Get.snackbar(
