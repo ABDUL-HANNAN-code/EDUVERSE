@@ -110,10 +110,36 @@ class FacultyDashboardController extends GetxController {
   // Approve appointment
   Future<void> approveAppointment(String appointmentId) async {
     try {
-      await _firestore.collection('appointments').doc(appointmentId).update({
+      final docRef = _firestore.collection('appointments').doc(appointmentId);
+      final doc = await docRef.get();
+      final data = doc.data();
+
+      // Ensure scheduledTime exists. If missing, try to derive from requestDate + requestTime
+      Timestamp? scheduled = data?['scheduledTime'];
+      if (scheduled == null) {
+        try {
+          final Timestamp? reqTs = data?['requestDate'];
+          final String? reqTime = data?['requestTime'];
+          if (reqTs != null && reqTime != null && reqTime.isNotEmpty) {
+            final dt = reqTs.toDate();
+            final parts = reqTime.split(':');
+            int hour = int.parse(parts[0]);
+            int minute = parts.length > 1 ? int.parse(parts[1]) : 0;
+            final scheduledDt = DateTime(dt.year, dt.month, dt.day, hour, minute);
+            scheduled = Timestamp.fromDate(scheduledDt);
+          }
+        } catch (_) {
+          scheduled = null;
+        }
+      }
+
+      final updateData = {
         'status': 'confirmed',
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+      if (scheduled != null) updateData['scheduledTime'] = scheduled;
+
+      await docRef.update(updateData);
       
       Get.snackbar('Success', 'Student appointment confirmed',
           backgroundColor: Colors.green, colorText: Colors.white);
@@ -198,7 +224,7 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
               if (controller.selectedTab.value == 'Requests') {
                 return _buildRequestsList();
               } else {
-                return _buildSchedulePlaceholder();
+                return _buildScheduleList();
               }
             }),
           ],
@@ -554,6 +580,87 @@ class FacultyDashboardScreen extends GetView<FacultyDashboardController> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildScheduleList() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Center(child: Text('Login Required'));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('appointments')
+          .where('profId', isEqualTo: uid)
+          .where('status', isEqualTo: 'confirmed')
+          .orderBy('scheduledTime', descending: false)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Colors.white));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Container(
+            height: 200,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.event_note, size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'No scheduled appointments',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: snapshot.data!.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final Timestamp? ts = data['scheduledTime'];
+            final date = ts?.toDate() ?? DateTime.now();
+            final dateStr = DateFormat('MMM d, yyyy').format(date);
+            final timeStr = DateFormat('h:mm a').format(date);
+            final studentName = data['studentName'] ?? 'Student';
+            final reason = data['reason'] ?? '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(studentName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 6),
+                        Text('$timeStr • $dateStr', style: TextStyle(color: Colors.grey[700])),
+                        if (reason.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text('Reason: $reason', style: TextStyle(color: Colors.grey[700])),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
     );
   }
   

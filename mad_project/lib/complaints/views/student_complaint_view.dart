@@ -255,7 +255,8 @@ class StudentComplaintView extends StatelessWidget {
                       const SizedBox(height: 8),
                       Row(
                         children: const [
-                          Icon(Icons.visibility_off, size: 14, color: Colors.grey),
+                          Icon(Icons.visibility_off,
+                              size: 14, color: Colors.grey),
                           SizedBox(width: 6),
                           Text(
                             'Submitted anonymously',

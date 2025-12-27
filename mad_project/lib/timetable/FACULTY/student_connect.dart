@@ -295,6 +295,22 @@ class BookingController extends GetxController {
 
       // Parse date
       final requestDateTime = DateTime.parse(selectedDate.value);
+      // Parse time slot into hours/minutes
+      int hour = 0;
+      int minute = 0;
+      try {
+        final parts = selectedTimeSlot.value.split(':');
+        hour = int.parse(parts[0]);
+        minute = int.parse(parts[1]);
+      } catch (_) {}
+
+      final scheduledDateTime = DateTime(
+        requestDateTime.year,
+        requestDateTime.month,
+        requestDateTime.day,
+        hour,
+        minute,
+      );
 
       // Create appointment
       await _firestore.collection('appointments').add({
@@ -302,11 +318,15 @@ class BookingController extends GetxController {
         'studentName': studentData?['name'] ?? 'Student',
         'studentEmail': studentData?['email'] ?? '',
         'facultyId': selectedFaculty.value!.id,
+        // also include profId for faculty dashboard compatibility
+        'profId': selectedFaculty.value!.id,
         'facultyName': selectedFaculty.value!.name,
         'facultyDept': selectedFaculty.value!.department,
         'facultyPhoto': selectedFaculty.value!.photoUrl,
         'requestDate': Timestamp.fromDate(requestDateTime),
         'requestTime': selectedTimeSlot.value,
+        // helpful for faculty-side queries & calendar display
+        'scheduledTime': Timestamp.fromDate(scheduledDateTime),
         'reason': reasonController.text.trim(),
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
@@ -554,13 +574,29 @@ class FacultyDirectoryScreen extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hi, ${FirebaseAuth.instance.currentUser?.displayName ?? "Alex"}!',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+              FutureBuilder<DocumentSnapshot?>(
+                future: () async {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid == null) return null;
+                  return FirebaseFirestore.instance.collection('users').doc(uid).get();
+                }(),
+                builder: (context, snap) {
+                  String name = 'Alex';
+                  if (snap.connectionState == ConnectionState.done && snap.hasData && snap.data?.data() != null) {
+                    final data = snap.data!.data() as Map<String, dynamic>;
+                    name = data['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'Alex';
+                  } else if (FirebaseAuth.instance.currentUser?.displayName != null) {
+                    name = FirebaseAuth.instance.currentUser!.displayName!;
+                  }
+                  return Text(
+                    'Hi, $name!',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 4),
               const Text(
@@ -1001,7 +1037,7 @@ class BookingBottomSheet extends StatelessWidget {
                     const SizedBox(height: 24),
                     _buildOfficeHours(),
                     const SizedBox(height: 20),
-                    _buildDateSelector(controller),
+                    _buildDateSelector(context, controller),
                     const SizedBox(height: 20),
                     _buildTimeSlotSelector(controller),
                     const SizedBox(height: 20),
@@ -1099,7 +1135,7 @@ class BookingBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildDateSelector(BookingController controller) {
+  Widget _buildDateSelector(BuildContext context, BookingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1112,64 +1148,53 @@ class BookingBottomSheet extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 80,
-          child: Obx(() {
-            final dates = controller.generateDates();
-            return ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: dates.length,
-              itemBuilder: (context, index) {
-                final date = DateTime.parse(dates[index]);
-                final isSelected = controller.selectedDate.value == dates[index];
-                return GestureDetector(
-                  onTap: () => controller.selectedDate.value = dates[index],
-                  child: Container(
-                    width: 70,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? accentColor : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected ? accentColor : Colors.grey[300]!,
-                        width: 2,
-                      ),
+        Obx(() {
+          // Embedded calendar picker
+          final currentSelected = controller.selectedDate.value;
+          DateTime initialDate;
+          try {
+            initialDate = currentSelected.isNotEmpty
+                ? DateTime.parse(currentSelected)
+                : DateTime.now().add(const Duration(days: 1));
+          } catch (_) {
+            initialDate = DateTime.now().add(const Duration(days: 1));
+          }
+
+          return SizedBox(
+            height: 320,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: Theme.of(context)
+                          .colorScheme
+                          .copyWith(primary: accentColor),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat('EEE').format(date),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected ? Colors.white : Colors.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          date.day.toString(),
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          DateFormat('MMM').format(date),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected ? Colors.white : Colors.grey,
-                          ),
-                        ),
-                      ],
+                    child: CalendarDatePicker(
+                      initialDate: initialDate,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      onDateChanged: (selected) {
+                        controller.selectedDate.value = DateFormat('yyyy-MM-dd').format(selected);
+                      },
                     ),
                   ),
-                );
-              },
-            );
-          }),
-        ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    currentSelected.isNotEmpty
+                        ? DateFormat('EEE, MMM d, yyyy').format(DateTime.parse(currentSelected))
+                        : 'No date selected',
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }
