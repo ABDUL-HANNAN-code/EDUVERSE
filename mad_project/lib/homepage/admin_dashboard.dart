@@ -14,6 +14,9 @@ import '../lost_and_found_admin.dart';
 import '../complaints/views/admin_complaint_list.dart';
 import '../auth.dart'; // IMPORTED AUTH SERVICE
 
+// --- IMPORT THE NEW ANNOUNCEMENTS MODULE ---
+import '../announcements/admin_announcement_view.dart';
+
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -170,7 +173,7 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   // ==========================================
-  // FACULTY CONNECT / INVITE DIALOG (UPDATED)
+  // FACULTY CONNECT / INVITE DIALOG
   // ==========================================
   void _showGenerateInviteDialog() {
     // 1. Validation: Ensure we know which university this admin belongs to
@@ -227,16 +230,18 @@ class _AdminDashboardState extends State<AdminDashboard>
           Get.back(); // Close input dialog
 
           // --- 3. IMPLICITLY OPEN EMAIL APP ---
-          final String subject = Uri.encodeComponent("Faculty Connect Invitation");
+          // Creates a mailto link with subject and body pre-filled
+          final String subject = Uri.encodeComponent("Faculty Invitation Code");
           final String body = Uri.encodeComponent(
-              "Hello,\n\nYou have been invited to join as Faculty.\n\nPlease use the following Invitation Code to register:\n$code\n\nRegards,\nAdmin");
+              "Hello,\n\nYou have been invited to join the faculty.\n\nYour invitation code is:\n$code\n\nPlease use this code to register.\n\nRegards,\nAdmin");
+          
           final Uri mailUri = Uri.parse("mailto:$email?subject=$subject&body=$body");
 
           try {
-            await launchUrl(mailUri, mode: LaunchMode.externalApplication);
+            await launchUrl(mailUri);
           } catch (e) {
             debugPrint("Could not launch email app: $e");
-            Get.snackbar("Info", "Could not open email app automatically.", backgroundColor: Colors.orange.shade100);
+            Get.snackbar("Info", "Could not open email app automatically. Please copy the code.", backgroundColor: Colors.orange.shade100);
           }
           // ------------------------------------
 
@@ -248,12 +253,10 @@ class _AdminDashboardState extends State<AdminDashboard>
                 const Icon(Icons.check_circle, color: Colors.green, size: 50),
                 const SizedBox(height: 10),
                 const Text(
-                  "Code generated and email draft opened.",
+                  "Code generated & Email opened!",
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 10),
-                const Text("Share this code with the professor:"),
                 const SizedBox(height: 10),
                 SelectableText(
                   code,
@@ -287,6 +290,9 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  // ==========================================
+  // MAIN BUILD
+  // ==========================================
   @override
   Widget build(BuildContext context) {
     if (isLoadingProfile) {
@@ -295,7 +301,17 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return Scaffold(
       appBar: AppBar(
-        leading: Navigator.canPop(context) ? const BackButton() : null,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // If there's no back stack, send user to the main dashboard
+              Get.offAllNamed('/dashboard');
+            }
+          },
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -315,7 +331,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               icon: const Icon(Icons.settings),
               onPressed: _showWizardMenu,
             ),
-          // Invite Button (Visible to admins)
+          // Invite Button (Preserved from your file)
           if (!isSuperAdmin && (isUniversityAdmin || isDepartmentAdmin))
             IconButton(
               icon: const Icon(Icons.person_add_alt_1),
@@ -649,6 +665,29 @@ class _AdminDashboardState extends State<AdminDashboard>
                 Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => RecruiterRequestsAdmin(
                         adminUniId: isUniversityAdmin ? selectedUni : null)));
+              },
+            ),
+            // --- ADDED ANNOUNCEMENT MANAGER ---
+            ListTile(
+              leading: const Icon(Icons.campaign, color: Colors.orange),
+              title: const Text('Manage Announcements'),
+              subtitle: const Text('Post & edit university announcements'),
+              onTap: () {
+                if (selectedUni == null) {
+                  Get.back(); // close drawer
+                  Get.snackbar(
+                    "Context Required", 
+                    "Please select a University from the dropdown above to manage its announcements.",
+                    backgroundColor: Colors.orange.shade100,
+                    duration: const Duration(seconds: 4)
+                  );
+                  return;
+                }
+                Navigator.pop(context); // Close drawer
+                Get.to(() => AdminAnnouncementView(
+                  uniId: selectedUni!, 
+                  adminName: userName,
+                ));
               },
             ),
           ],
@@ -1049,6 +1088,7 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     return GestureDetector(
       onTap: () => _showClassDetails(data),
+      onLongPress: () => _showEditClassDialog(data),
       child: Container(
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
@@ -1115,7 +1155,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
             const SizedBox(height: 2),
             Text(
-              '${_formatTime12(data['start'] ?? '')} - ${_formatTime12(data['end'] ?? '')}',
+              '${data['start']} - ${data['end']}',
               style: TextStyle(color: textColor.withOpacity(0.85), fontSize: 8),
             ),
             Text(
@@ -1365,7 +1405,7 @@ class _AdminDashboardState extends State<AdminDashboard>
             _buildDetailRow('Day', data['day'] ?? ''),
             _buildDetailRow(
               'Time',
-              '${_formatTime12(data['start'] ?? '')} - ${_formatTime12(data['end'] ?? '')}',
+              '${data['start'] ?? ''} - ${data['end'] ?? ''}',
             ),
             _buildDetailRow('Room', data['location'] ?? ''),
             _buildDetailRow('Teacher', data['teacher'] ?? ''),
@@ -1379,7 +1419,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         ),
         actions: [
           TextButton(onPressed: () => Get.back(), child: const Text('Close')),
-          if (isSuperAdmin || isUniversityAdmin || isDepartmentAdmin)
+          if (isSuperAdmin)
             TextButton(
               onPressed: () {
                 Get.back();
@@ -1410,7 +1450,13 @@ class _AdminDashboardState extends State<AdminDashboard>
               },
               child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
-          // Edit action removed — editing classes disabled
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              _showEditClassDialog(data);
+            },
+            child: const Text('Edit'),
+          ),
         ],
       ),
     );
@@ -1434,7 +1480,150 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // Edit class dialog and logic removed per request.
+  void _showEditClassDialog(Map<String, dynamic> data) {
+    final subjectCtrl = TextEditingController(text: data['subject']);
+    final teacherCtrl = TextEditingController(text: data['teacher']);
+    final roomCtrl = TextEditingController(text: data['location']);
+    String day = data['day'];
+    String startTime = data['start'];
+    bool isLab = data['isLab'] ?? false;
+
+    Get.defaultDialog(
+      title: "Edit Class",
+      content: StatefulBuilder(
+        builder: (context, setState) {
+          final availableSlots = _getAvailableSlots(selectedShift, isLab);
+          if (!availableSlots.contains(startTime)) {
+            startTime = availableSlots.first;
+          }
+          final endTime = _calculateEndTime(startTime, isLab);
+
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  title: const Text("Is this a Lab?"),
+                  subtitle: Text(
+                    isLab ? "Duration: 180 minutes" : "Duration: 80 minutes",
+                  ),
+                  value: isLab,
+                  onChanged: (val) => setState(() => isLab = val),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField(
+                  value: day,
+                  items: days
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (v) => setState(() => day = v!),
+                  decoration: const InputDecoration(
+                    labelText: "Day",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: startTime,
+                  items: availableSlots
+                      .map(
+                        (slot) => DropdownMenuItem(
+                          value: slot,
+                          child: Text(
+                            '$slot - ${_calculateEndTime(slot, isLab)}',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => startTime = v!),
+                  decoration: const InputDecoration(
+                    labelText: "Time Slot",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: subjectCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Subject",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: roomCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Room No",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: teacherCtrl,
+                  decoration: const InputDecoration(
+                    labelText: "Teacher Name",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      confirm: ElevatedButton(
+        child: const Text("Update"),
+        onPressed: () async {
+          final endTime = _calculateEndTime(startTime, isLab);
+
+          final conflict = await _service.checkConflict(
+            uniId: selectedUni!,
+            day: day,
+            startTime: startTime,
+            endTime: endTime,
+            room: roomCtrl.text.trim(),
+            teacher: teacherCtrl.text.trim(),
+            excludeDocId: data['docId'],
+          );
+
+          if (conflict != null) {
+            Get.snackbar(
+              "Conflict Detected!",
+              conflict,
+              backgroundColor: Colors.red.shade100,
+              duration: const Duration(seconds: 5),
+            );
+            return;
+          }
+
+          await _db
+              .collection('universities')
+              .doc(selectedUni!)
+              .collection('timetables')
+              .doc(data['docId'])
+              .update({
+            'day': day,
+            'start': startTime,
+            'end': endTime,
+            'subject': subjectCtrl.text.trim(),
+            'location': roomCtrl.text.trim(),
+            'teacher': teacherCtrl.text.trim(),
+            'isLab': isLab,
+          });
+
+          Get.back();
+          Get.snackbar(
+            "Success",
+            "Class updated successfully",
+            backgroundColor: Colors.green.shade100,
+          );
+        },
+      ),
+      cancel: TextButton(
+        onPressed: () => Get.back(),
+        child: const Text("Cancel"),
+      ),
+    );
+  }
 
   void _showAddClassDialog() {
     if (selectedUni == null ||

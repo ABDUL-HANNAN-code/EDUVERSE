@@ -10,6 +10,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'student_marketplace.dart';
 import 'homepage/profile_screen.dart';
 
+// Announcements module
+import 'announcements/student_announcement_view.dart';
 
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
@@ -73,23 +75,23 @@ void main() async {
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('An error occurred',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Text(details.exceptionAsString()),
-                const SizedBox(height: 12),
-                Text(details.stack.toString()),
-              ],
-            ),
+    // Return a simple Scaffold instead of a nested MaterialApp to avoid
+    // creating another Navigator (which can cause GlobalKey conflicts).
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('An error occurred',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Text(details.exceptionAsString()),
+              const SizedBox(height: 12),
+              Text(details.stack.toString()),
+            ],
           ),
         ),
       ),
@@ -168,6 +170,11 @@ class UniversityApp extends StatelessWidget {
             GetPage(name: '/faculty-connect', page: () => const MainNavigationScreen()),
 
             GetPage(name: '/profile', page: () => const ProfileScreen()),
+
+            // --- ADDED ANNOUNCEMENTS ROUTES HERE ---
+            GetPage(name: '/announcements', page: () => const StudentAnnouncementFeed()),
+            // alias route (used by dashboard tile)
+            GetPage(name: '/student_announcements_view', page: () => const StudentAnnouncementFeed()),
           ],
         );
       },
@@ -195,19 +202,11 @@ class AuthGate extends StatelessWidget {
           // Route based on role
           if (role == 'faculty') return const FacultyDashboardScreen();
           if (role == 'recruiter') return const RecruiterAdminPanel();
-
-          if (role == 'admin') {
-            // Decide admin landing based on adminScope: department admins should see AdminDashboard,
-            // university-level admins should land on the regular HomeDashboard.
-            final adminScope = userData?['adminScope'];
-            if (adminScope is Map && adminScope['deptId'] != null) {
-              return const AdminDashboard();
-            }
-            // University-level admin (no deptId) — open HomeDashboard instead of Admin panel
-            return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
-          }
-
-          return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
+          if (role == 'admin') return const AdminDashboard();
+          
+          return user.emailVerified 
+              ? const HomeDashboard() 
+              : const VerifyEmailView();
         }
       );
     }
