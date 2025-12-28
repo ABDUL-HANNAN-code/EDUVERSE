@@ -15,21 +15,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:googleapis_auth/auth_io.dart'; // REQUIRED: Add googleapis_auth to pubspec
 import 'package:http/http.dart' as http; // REQUIRED: Add http to pubspec
 
+// --- IMPORT GLOBAL THEME ---
+import 'theme_colors.dart';
+
 // ============================================================================
 // 0. TOP-LEVEL BACKGROUND HANDLER
 // ============================================================================
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint("Handling a background message: ${message.messageId}");
-}
-
-// Theme Constants
-class AppTheme {
-  static const Color kPrimaryColor = Color(0xFF6C63FF);
-  static const Color kSecondaryColor = Color(0xFF4A90E2);
-  static const Color kBackgroundColor = Color(0xFFF5F7FA);
-  static const Color kDarkTextColor = Color(0xFF2D3142);
-  static const Color kWhiteColor = Color(0xFFFFFFFF);
 }
 
 // ============================================================================
@@ -121,7 +115,7 @@ class AppNotification {
       NotificationType.complaintResolved: Color(0xFF4CAF50),
       NotificationType.marketplace: Color(0xFF9C27B0),
     };
-    return colors[type] ?? const Color(0xFF6C63FF);
+    return colors[type] ?? kPrimaryColor;
   }
 
   AppNotification copyWith({bool? isRead, bool? isPushSent}) {
@@ -156,15 +150,12 @@ class NotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
-  // ⚠️ REPLACE WITH YOUR FIREBASE PROJECT ID (Found in Project Settings > General)
   static const String _projectId = 'my-project-859f5'; 
 
   // --- INITIALIZATION ---
   Future<void> init() async {
-    // 1. Background Handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // 2. Request Permissions
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -172,7 +163,6 @@ class NotificationService {
     );
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-    // 3. Setup Local Notifications
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
     
@@ -193,7 +183,6 @@ class NotificationService {
       },
     );
 
-    // 4. Foreground Listener
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       if (message.notification != null) {
         showLocalNotification(
@@ -333,8 +322,6 @@ class NotificationService {
     );
   }
   
-  // (You can replicate the pattern below for other module methods: notifyJobPosting, etc.)
-
   Future<void> _createAndPushNotification({
     required String title,
     required String body,
@@ -347,7 +334,6 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     try {
-      // 1. SAVE TO DB
       final docRef = await FirebaseFirestore.instance.collection('notifications').add({
         'title': title,
         'body': body,
@@ -363,9 +349,7 @@ class NotificationService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 2. SEND HTTP V1 PUSH
       if (userId != null) {
-        // Target Specific User
         final tokensSnapshot = await _db.collection('users').doc(userId).collection('fcmTokens').get();
         for (var doc in tokensSnapshot.docs) {
           await _sendV1Push(
@@ -376,7 +360,6 @@ class NotificationService {
           );
         }
       } else {
-        // Broadcast to Topic
         await _sendV1Push(
           topic: 'university_$universityId',
           title: title,
@@ -392,7 +375,7 @@ class NotificationService {
     }
   }
 
-  // --- V1 API PUSH SENDER (CLIENT SIDE MINTING) ---
+  // --- V1 API PUSH SENDER ---
   Future<void> _sendV1Push({
     String? token,
     String? topic,
@@ -401,16 +384,13 @@ class NotificationService {
     Map<String, dynamic>? data,
   }) async {
     try {
-      // 1. Load Service Account from Assets
       final String response = await rootBundle.loadString('assets/service_account.json');
       final Map<String, dynamic> saMap = jsonDecode(response) as Map<String, dynamic>;
       final serviceAccountCredentials = ServiceAccountCredentials.fromJson(saMap);
 
-      // 2. Get Authenticated Client
       final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
       final client = await clientViaServiceAccount(serviceAccountCredentials, scopes);
 
-      // 3. Construct Payload
       final Map<String, dynamic> messagePayload = {
         'message': {
           if (token != null) 'token': token,
@@ -423,7 +403,6 @@ class NotificationService {
         }
       };
 
-      // 4. Send Request
       final url = Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send');
       
       final httpResponse = await client.post(
@@ -619,10 +598,7 @@ class NotificationService {
     }
   }
 
-  // ... (Keep your loadUserPreferences, saveUserPreferences, other helper methods here) ...
-  
   AppNotification _docToNotification(QueryDocumentSnapshot doc) {
-    // (Keep your existing _docToNotification logic here)
     final data = doc.data() as Map<String, dynamic>;
     DateTime createdAt;
     final ts = data['createdAt'];
@@ -632,25 +608,43 @@ class NotificationService {
       createdAt = DateTime.now();
     }
     
-    // ... rest of mapping logic
+    NotificationType type = NotificationType.custom;
+    try {
+      final typeStr = (data['type'] as String?) ?? 'custom';
+      type = NotificationType.values.firstWhere(
+          (t) => t.toString().split('.').last == typeStr,
+          orElse: () => NotificationType.custom);
+    } catch (_) {}
+
+    NotificationPriority priority = NotificationPriority.normal;
+    try {
+      final p = (data['priority'] as String?) ?? 'normal';
+      priority = NotificationPriority.values.firstWhere(
+          (t) => t.toString().split('.').last == p,
+          orElse: () => NotificationPriority.normal);
+    } catch (_) {}
+
     return AppNotification(
       id: doc.id,
       title: data['title'] ?? '',
       body: data['body'] ?? '',
-      type: NotificationType.custom, // Simplify for brevity in this snippet
-      priority: NotificationPriority.normal,
+      type: type, 
+      priority: priority,
       universityId: data['universityId'] ?? '',
+      userId: data['userId'] as String?,
+      imageUrl: data['imageUrl'] as String?,
+      imageBase64: data['imageBase64'] as String?,
+      data: Map<String, dynamic>.from(data['data'] ?? {}),
       createdAt: createdAt,
+      isRead: data['isRead'] as bool? ?? false,
+      isPushSent: data['isPushSent'] as bool? ?? false,
     );
   }
-  
-  // ... (Add back module specific methods like notifyComplaintStatus using _createAndPushNotification) ...
 }
 
 // ============================================================================
-// 3. NOTIFICATION PAGE UI (Keep your existing UI code)
+// 3. NOTIFICATION PAGE UI
 // ============================================================================
-// (Paste your NotificationPage and UI widgets here from the previous file)============================================================================
 
 class NotificationPage extends StatefulWidget {
   final String userId;
@@ -675,14 +669,12 @@ class _NotificationPageState extends State<NotificationPage>
   int _unreadCount = 0;
   int _totalCount = 0;
   StreamSubscription<List<AppNotification>>? _subs;
-  // Resolved university id to use for queries (may be resolved from user doc)
   String _resolvedUniversityId = '';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // If universityId wasn't provided, resolve it from the user's profile first.
     () async {
       String uni = widget.universityId;
       try {
@@ -724,16 +716,14 @@ class _NotificationPageState extends State<NotificationPage>
     super.dispose();
   }
 
-  // no-op: realtime stream is used; pull-to-refresh will re-fetch once
-
   Future<void> _markAllAsRead() async {
     await _service.markAllAsRead(widget.userId, _resolvedUniversityId);
    
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('All notifications marked as read'),
-          backgroundColor: AppTheme.kPrimaryColor,
+        const SnackBar(
+          content: Text('All notifications marked as read'),
+          backgroundColor: kPrimaryColor,
         ),
       );
     }
@@ -741,28 +731,36 @@ class _NotificationPageState extends State<NotificationPage>
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic theme colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final appBarColor = Theme.of(context).appBarTheme.backgroundColor;
+    final fgColor = Theme.of(context).appBarTheme.foregroundColor;
+    final unselectedLabelColor = isDark ? Colors.white70 : kDarkTextColor.withOpacity(0.5);
+
     return Scaffold(
-      backgroundColor: AppTheme.kBackgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppTheme.kWhiteColor,
+        backgroundColor: appBarColor,
         title: Text(
           'Notifications',
           style: TextStyle(
-            color: AppTheme.kDarkTextColor,
+            color: fgColor,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
+        iconTheme: IconThemeData(color: fgColor), // Makes back button correct color
         actions: [
           if (_unreadCount > 0)
             IconButton(
-              icon: Icon(Icons.done_all, color: AppTheme.kPrimaryColor),
+              icon: const Icon(Icons.done_all, color: kPrimaryColor),
               onPressed: _markAllAsRead,
               tooltip: 'Mark all as read',
             ),
           IconButton(
-            icon: Icon(Icons.settings, color: AppTheme.kPrimaryColor),
+            icon: const Icon(Icons.settings, color: kPrimaryColor),
             onPressed: () {
               Navigator.push(
                 context,
@@ -778,9 +776,9 @@ class _NotificationPageState extends State<NotificationPage>
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: AppTheme.kPrimaryColor,
-          unselectedLabelColor: AppTheme.kDarkTextColor.withOpacity(0.5),
-          indicatorColor: AppTheme.kPrimaryColor,
+          labelColor: kPrimaryColor,
+          unselectedLabelColor: unselectedLabelColor,
+          indicatorColor: kPrimaryColor,
           onTap: (index) {
             setState(() {
               _showUnreadOnly = index == 1;
@@ -802,7 +800,7 @@ class _NotificationPageState extends State<NotificationPage>
                       margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: AppTheme.kPrimaryColor.withOpacity(0.1),
+                        color: kPrimaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -841,14 +839,13 @@ class _NotificationPageState extends State<NotificationPage>
         stream: _notificationsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: AppTheme.kPrimaryColor));
+            return const Center(child: CircularProgressIndicator(color: kPrimaryColor));
           }
           if (snapshot.hasError) {
             debugPrint('Notifications stream error: ${snapshot.error}');
             return Center(child: Text('Error loading notifications: ${snapshot.error}'));
           }
           final notifications = snapshot.data ?? [];
-          final unreadCount = notifications.where((n) => !n.isRead).length;
 
           if (notifications.isEmpty) return _buildEmptyState();
 
@@ -856,7 +853,7 @@ class _NotificationPageState extends State<NotificationPage>
             onRefresh: () async {
               await _service.fetchNotifications(userId: widget.userId, universityId: widget.universityId, unreadOnly: _showUnreadOnly);
             },
-            color: AppTheme.kPrimaryColor,
+            color: kPrimaryColor,
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: notifications.length,
@@ -876,6 +873,10 @@ class _NotificationPageState extends State<NotificationPage>
   }
 
   Widget _buildEmptyState() {
+    // Dynamic text color for empty state
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : kDarkTextColor.withOpacity(0.6);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -883,14 +884,14 @@ class _NotificationPageState extends State<NotificationPage>
           Icon(
             _showUnreadOnly ? Icons.notifications_none : Icons.notifications_off,
             size: 80,
-            color: AppTheme.kPrimaryColor.withOpacity(0.3),
+            color: kPrimaryColor.withOpacity(0.3),
           ),
           const SizedBox(height: 16),
           Text(
             _showUnreadOnly ? 'No unread notifications' : 'No notifications yet',
             style: TextStyle(
               fontSize: 18,
-              color: AppTheme.kDarkTextColor.withOpacity(0.6),
+              color: textColor,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -901,7 +902,7 @@ class _NotificationPageState extends State<NotificationPage>
                 : 'We\'ll notify you when something happens',
             style: TextStyle(
               fontSize: 14,
-              color: AppTheme.kDarkTextColor.withOpacity(0.4),
+              color: textColor.withOpacity(0.6),
             ),
           ),
         ],
@@ -913,7 +914,6 @@ class _NotificationPageState extends State<NotificationPage>
     if (!notification.isRead) {
       await _service.markAsRead(notification.id);
     }
-    // TODO: Navigate based on notification.type and notification.data
     _showNotificationDetail(notification);
   }
 
@@ -943,6 +943,11 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme Logic
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final cardColor = isDark ? const Color(0xFF2D2557).withOpacity(0.5) : kWhiteColor;
+
     return Dismissible(
       key: Key(notification.id),
       background: Container(
@@ -963,15 +968,15 @@ class _NotificationCard extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: notification.isRead
-                ? AppTheme.kWhiteColor
-                : AppTheme.kPrimaryColor.withOpacity(0.05),
+                ? cardColor
+                : kPrimaryColor.withOpacity(0.05),
             borderRadius: BorderRadius.circular(16),
             border: notification.isRead
                 ? null
-                : Border.all(color: AppTheme.kPrimaryColor.withOpacity(0.2), width: 1),
+                : Border.all(color: kPrimaryColor.withOpacity(0.2), width: 1),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.kDarkTextColor.withOpacity(0.05),
+                color: textColor.withOpacity(0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -1005,7 +1010,7 @@ class _NotificationCard extends StatelessWidget {
                               fontWeight: notification.isRead
                                   ? FontWeight.w600
                                   : FontWeight.bold,
-                              color: AppTheme.kDarkTextColor,
+                              color: textColor,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1034,7 +1039,7 @@ class _NotificationCard extends StatelessWidget {
                       notification.body,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.kDarkTextColor.withOpacity(0.7),
+                        color: textColor.withOpacity(0.7),
                         height: 1.4,
                       ),
                       maxLines: 2,
@@ -1045,7 +1050,7 @@ class _NotificationCard extends StatelessWidget {
                       notification.timeAgo,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.kSecondaryColor,
+                        color: kSecondaryColor,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1060,7 +1065,7 @@ class _NotificationCard extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppTheme.kPrimaryColor,
+                    color: kPrimaryColor,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1080,6 +1085,11 @@ class _NotificationDetailDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Dialog Background
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Theme.of(context).cardColor : kWhiteColor;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+
     Uint8List? imageBytes;
     if (notification.imageBase64 != null) {
       try {
@@ -1094,7 +1104,7 @@ class _NotificationDetailDialog extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
         decoration: BoxDecoration(
-          color: AppTheme.kWhiteColor,
+          color: bgColor,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
@@ -1166,7 +1176,7 @@ class _NotificationDetailDialog extends StatelessWidget {
                       notification.body,
                       style: TextStyle(
                         fontSize: 16,
-                        color: AppTheme.kDarkTextColor,
+                        color: textColor,
                         height: 1.6,
                       ),
                     ),
@@ -1176,13 +1186,13 @@ class _NotificationDetailDialog extends StatelessWidget {
                     // Time
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 16, color: AppTheme.kSecondaryColor),
+                        const Icon(Icons.access_time, size: 16, color: kSecondaryColor),
                         const SizedBox(width: 8),
                         Text(
                           notification.timeAgo,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
-                            color: AppTheme.kSecondaryColor,
+                            color: kSecondaryColor,
                           ),
                         ),
                       ],
@@ -1264,21 +1274,27 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic theme
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final appBarColor = Theme.of(context).appBarTheme.backgroundColor;
+    final fgColor = Theme.of(context).appBarTheme.foregroundColor;
+
     return Scaffold(
-      backgroundColor: AppTheme.kBackgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppTheme.kWhiteColor,
+        backgroundColor: appBarColor,
         title: Text(
           'Notification Settings',
           style: TextStyle(
-            color: AppTheme.kDarkTextColor,
+            color: fgColor,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
+        iconTheme: IconThemeData(color: fgColor), // Fix back button
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppTheme.kDarkTextColor),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1312,13 +1328,18 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Widget _buildSection(String title, List<Widget> children) {
+    // Dynamic Section Container
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sectionColor = isDark ? Theme.of(context).cardColor : kWhiteColor;
+    final titleColor = isDark ? Colors.white : kDarkTextColor;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.kWhiteColor,
+        color: sectionColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.kDarkTextColor.withOpacity(0.05),
+            color: kDarkTextColor.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1334,7 +1355,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.kDarkTextColor,
+                color: titleColor,
               ),
             ),
           ),
@@ -1346,6 +1367,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Widget _buildSwitch(String title, bool value, Function(bool) onChanged) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : kDarkTextColor;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
@@ -1355,13 +1379,13 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             title,
             style: TextStyle(
               fontSize: 16,
-              color: AppTheme.kDarkTextColor,
+              color: textColor,
             ),
           ),
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppTheme.kPrimaryColor,
+            activeColor: kPrimaryColor,
           ),
         ],
       ),
@@ -1406,17 +1430,15 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
   }
 
   Future<void> _pickImage() async {
-    // In production, use image_picker package
-    // For demo, we'll use a placeholder
     setState(() {
       _imageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     });
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Image selected (demo mode)'),
-          backgroundColor: AppTheme.kPrimaryColor,
+        const SnackBar(
+          content: Text('Image selected (demo mode)'),
+          backgroundColor: kPrimaryColor,
         ),
       );
     }
@@ -1473,21 +1495,47 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme Logic
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final cardColor = isDark ? Theme.of(context).cardColor : kWhiteColor;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final hintColor = isDark ? Colors.white54 : kSecondaryColor;
+
+    // Helper for input decoration
+    InputDecoration getInputDecoration(String label, {IconData? icon, String? hint}) {
+      return InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: hintColor),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: kPrimaryColor, width: 2),
+        ),
+        filled: true,
+        fillColor: cardColor,
+        prefixIcon: icon != null ? Icon(icon, color: hintColor) : null,
+        hintText: hint,
+        hintStyle: TextStyle(color: hintColor.withOpacity(0.5)),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: AppTheme.kBackgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppTheme.kWhiteColor,
+        backgroundColor: cardColor,
         title: Text(
           'Send Custom Notification',
           style: TextStyle(
-            color: AppTheme.kDarkTextColor,
+            color: textColor,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
+        iconTheme: IconThemeData(color: textColor),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppTheme.kDarkTextColor),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -1502,20 +1550,20 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.kPrimaryColor.withOpacity(0.1),
+                  color: kPrimaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.kPrimaryColor.withOpacity(0.3)),
+                  border: Border.all(color: kPrimaryColor.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: AppTheme.kPrimaryColor),
+                    const Icon(Icons.info_outline, color: kPrimaryColor),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'Custom notifications will be sent as push notifications and appear in the notification feed',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.kDarkTextColor.withOpacity(0.8),
+                          color: textColor.withOpacity(0.8),
                         ),
                       ),
                     ),
@@ -1528,25 +1576,9 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               // Title Field
               TextFormField(
                 controller: _titleController,
-                decoration: InputDecoration(
-                  labelText: 'Title *',
-                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: AppTheme.kWhiteColor,
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a title';
-                  }
-                  return null;
-                },
+                style: TextStyle(color: textColor),
+                decoration: getInputDecoration('Title *'),
+                validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter a title' : null,
               ),
               
               const SizedBox(height: 16),
@@ -1554,27 +1586,10 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               // Body Field
               TextFormField(
                 controller: _bodyController,
-                decoration: InputDecoration(
-                  labelText: 'Message *',
-                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: AppTheme.kWhiteColor,
-                  alignLabelWithHint: true,
-                ),
+                style: TextStyle(color: textColor),
+                decoration: getInputDecoration('Message *'),
                 maxLines: 4,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a message';
-                  }
-                  return null;
-                },
+                validator: (value) => (value == null || value.trim().isEmpty) ? 'Please enter a message' : null,
               ),
               
               const SizedBox(height: 16),
@@ -1583,9 +1598,9 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.kWhiteColor,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1595,7 +1610,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.kDarkTextColor,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1609,11 +1624,12 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                           onSelected: (selected) {
                             setState(() => _priority = priority);
                           },
-                          selectedColor: AppTheme.kPrimaryColor,
+                          selectedColor: kPrimaryColor,
                           labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : AppTheme.kDarkTextColor,
+                            color: isSelected ? Colors.white : textColor,
                             fontWeight: FontWeight.bold,
                           ),
+                          backgroundColor: isDark ? Colors.white10 : Colors.grey.shade200,
                         );
                       }).toList(),
                     ),
@@ -1627,9 +1643,9 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppTheme.kWhiteColor,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: isDark ? Colors.white10 : Colors.grey.shade300),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1642,7 +1658,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.kDarkTextColor,
+                            color: textColor,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -1650,7 +1666,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                           'Send to all students in your university',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppTheme.kDarkTextColor.withOpacity(0.6),
+                            color: textColor.withOpacity(0.6),
                           ),
                         ),
                       ],
@@ -1660,7 +1676,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                       onChanged: (value) {
                         setState(() => _isBroadcast = value);
                       },
-                      activeColor: AppTheme.kPrimaryColor,
+                      activeColor: kPrimaryColor,
                     ),
                   ],
                 ),
@@ -1674,7 +1690,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               
@@ -1683,20 +1699,11 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               // Image URL Field
               TextFormField(
                 controller: _imageUrlController,
-                decoration: InputDecoration(
-                  labelText: 'Image URL',
-                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
-                  ),
-                  filled: true,
-                  fillColor: AppTheme.kWhiteColor,
-                  prefixIcon: Icon(Icons.link, color: AppTheme.kSecondaryColor),
-                  hintText: 'https://example.com/image.jpg',
+                style: TextStyle(color: textColor),
+                decoration: getInputDecoration(
+                  'Image URL', 
+                  icon: Icons.link, 
+                  hint: 'https://example.com/image.jpg'
                 ),
               ),
               
@@ -1704,28 +1711,18 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               
               Row(
                 children: [
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      color: Colors.grey.shade300,
-                    ),
-                  ),
+                  Expanded(child: Container(height: 1, color: isDark ? Colors.white12 : Colors.grey.shade300)),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
                       'OR',
                       style: TextStyle(
-                        color: AppTheme.kDarkTextColor.withOpacity(0.5),
+                        color: textColor.withOpacity(0.5),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: Container(
-                      height: 1,
-                      color: Colors.grey.shade300,
-                    ),
-                  ),
+                  Expanded(child: Container(height: 1, color: isDark ? Colors.white12 : Colors.grey.shade300)),
                 ],
               ),
               
@@ -1734,14 +1731,14 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               // Upload Image Button
               OutlinedButton.icon(
                 onPressed: _pickImage,
-                icon: Icon(Icons.upload_file, color: AppTheme.kPrimaryColor),
+                icon: const Icon(Icons.upload_file, color: kPrimaryColor),
                 label: Text(
                   _imageBase64 != null ? 'Image Selected ✓' : 'Upload Image (Base64)',
-                  style: TextStyle(color: AppTheme.kPrimaryColor),
+                  style: const TextStyle(color: kPrimaryColor),
                 ),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: AppTheme.kPrimaryColor),
+                  side: const BorderSide(color: kPrimaryColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1754,20 +1751,20 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
                   child: Container(
                     height: 150,
                     decoration: BoxDecoration(
-                      color: AppTheme.kBackgroundColor,
+                      color: bgColor,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade300),
                     ),
                     child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.image, size: 50, color: AppTheme.kPrimaryColor),
+                          const Icon(Icons.image, size: 50, color: kPrimaryColor),
                           const SizedBox(height: 8),
                           Text(
                             'Image Preview',
                             style: TextStyle(
-                              color: AppTheme.kDarkTextColor.withOpacity(0.6),
+                              color: textColor.withOpacity(0.6),
                             ),
                           ),
                         ],
@@ -1782,7 +1779,7 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _sendNotification,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.kPrimaryColor,
+                  backgroundColor: kPrimaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -1821,5 +1818,3 @@ class _AdminNotificationSenderState extends State<AdminNotificationSender> {
     );
   }
 }
-
-// Demo app section removed — notifications library provides service and widgets for app integration.

@@ -17,7 +17,8 @@
   },
   "homepage": "https://github.com/ABDUL-HANNAN-code/EDUVERSE#readme",
   "dependencies": {
-    "firebase-admin": "^13.6.0"
+    "firebase-admin": "^13.6.0",
+    "minimist": "^1.2.8"
   },
   "description": ""
 }

@@ -26,7 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart'; // Added for .env support
-
+import 'package:reclaimify/theme_colors.dart';
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -36,11 +36,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart'; // Added for .env support
 const String groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
 // Color Palette
-const Color kPrimaryColor = Color(0xFF6C63FF);
-const Color kSecondaryColor = Color(0xFF4A90E2);
-const Color kBackgroundColor = Color(0xFFF5F7FA);
-const Color kWhiteColor = Colors.white;
-const Color kDarkTextColor = Color(0xFF2D3142);
+// const Color kPrimaryColor = Color(0xFF6C63FF);
+// const Color kSecondaryColor = Color(0xFF4A90E2);
+// const Color kBackgroundColor = Color(0xFFF5F7FA);
+// const Color kWhiteColor = Colors.white;
+// const Color kDarkTextColor = Color(0xFF2D3142);
 
 // This file is a module (widget set) intended to be embedded inside the
 // main app. It no longer defines its own `main()` or `MaterialApp` to avoid

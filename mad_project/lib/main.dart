@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
+// import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -10,33 +11,30 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'student_marketplace.dart';
-import 'homepage/profile_screen.dart';
 
-// Announcements module
-import 'announcements/student_announcement_view.dart';
-import 'notifications.dart';
+// --- 1. IMPORT YOUR THEME FILE ---
+import 'theme_colors.dart'; 
 
-// Complaints views
+// --- 2. MODULE IMPORTS WITH 'HIDE' TO PREVENT CONFLICTS ---
+// We tell Dart: "Import these files, but IGNORE their color definitions"
+// so they don't clash with theme_colors.dart
+
+import 'student_marketplace.dart' hide kPrimaryColor, kSecondaryColor, kBackgroundColor, kDarkBackgroundColor, kWhiteColor, kDarkTextColor;
+import 'homepage/profile_screen.dart' hide kPrimaryColor, kSecondaryColor, kBackgroundColor, kDarkBackgroundColor, kWhiteColor, kDarkTextColor;
+import 'announcements/student_announcement_view.dart' hide kPrimaryColor, kSecondaryColor, kBackgroundColor, kDarkBackgroundColor, kWhiteColor, kDarkTextColor;
+import 'notifications.dart'; // You already fixed this file, so no hide needed usually, but safe to add if needed.
 import 'complaints/views/student_complaint_view.dart';
 import 'complaints/views/create_complaint_screen.dart';
 import 'complaints/views/admin_complaint_list.dart';
-
 import 'shared.dart'; 
 import 'auth.dart'; 
 import 'lost_and_found.dart'; 
 import 'timetable/index.dart'; 
 import 'homepage/index.dart'; 
 import 'homepage/admin_dashboard.dart';
-
-// AI Study Planner module
-import 'ai_study_planner/ai_study_planner.dart';
-
-// Placement module
+import 'ai_study_planner/ai_study_planner.dart' hide kPrimaryColor, kSecondaryColor, kBackgroundColor, kDarkBackgroundColor, kWhiteColor, kDarkTextColor;
 import 'timetable/placements/student_placement_screen.dart';
 import 'timetable/placements/recruiter_admin_panel.dart';
-
-// FACULTY DASHBOARD IMPORT (Preserved from your local changes)
 import 'timetable/FACULTY/faculty_dashboard.dart'; 
 import 'timetable/FACULTY/student_connect.dart';
 
@@ -65,113 +63,27 @@ void main() async {
     FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
   } catch (e) {}
 
-  // Register FCM token and listen for token refresh (if user signed in)
+  // Initialize Notifications
   try {
-    FirebaseMessaging.instance.getToken().then((token) async {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && token != null) {
-        await NotificationService().registerFcmToken(userId: user.uid, token: token);
-      }
-    });
-
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && token != null) {
-        await NotificationService().registerFcmToken(userId: user.uid, token: token);
-      }
-    });
-  } catch (e) {
-    debugPrint('FCM init error: $e');
-  }
-
-    // Initialize local notifications and FCM handlers (skip local notifications on web)
-    try {
-      if (!kIsWeb) {
-        await _initLocalNotifications();
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-        // Foreground message -> show local notification (mobile only)
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-          try {
-            final notif = message.notification;
-            final title = notif?.title ?? '';
-            final body = notif?.body ?? '';
-
-            const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-              'eduverse_high',
-              'Eduverse High Priority',
-              channelDescription: 'High priority notifications for Eduverse',
-              importance: Importance.high,
-              priority: Priority.high,
-            );
-            const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
-
-            await flutterLocalNotificationsPlugin.show(
-              message.hashCode,
-              title,
-              body,
-              platformDetails,
-              payload: message.data['notificationId']?.toString() ?? '',
-            );
-          } catch (e) {
-            debugPrint('onMessage show local notification error: $e');
-          }
-        });
-      }
-
-      // Request permission (iOS) and attempt to ensure notification permission on Android
-      try {
-        final settings = await FirebaseMessaging.instance.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
-        debugPrint('FCM permission status: ${settings.authorizationStatus}');
-      } catch (e) {
-        debugPrint('FCM requestPermission error: $e');
-      }
-
-      // When the app is opened from a terminated state via a notification
-      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) async {
-        if (message != null) {
-          final nid = message.data['notificationId'];
-          // navigate to notification page
-          try {
-            final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-            Get.toNamed('/notifications', arguments: {'userId': uid});
-          } catch (_) {}
+    if (!kIsWeb) {
+      await NotificationService().init();
+      
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await NotificationService().registerFcmToken(userId: user.uid, token: token);
         }
       });
-
-      // When the app is opened from background via a notification tap
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        final nid = message.data['notificationId'];
-        try {
-          final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-          Get.toNamed('/notifications', arguments: {'userId': uid});
-        } catch (_) {}
-      });
-    } catch (e) {
-      debugPrint('FCM handlers init error: $e');
+      
+      final token = await FirebaseMessaging.instance.getToken();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && token != null) {
+        await NotificationService().registerFcmToken(userId: user.uid, token: token);
+      }
     }
-
-  // Foreground message handler: show simple SnackBar
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    try {
-      final notif = message.notification;
-      final title = notif?.title ?? '';
-      final body = notif?.body ?? '';
-      // Use navigatorKey or current context via WidgetsBinding
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final navigator = Navigator.of(Get.context!);
-        ScaffoldMessenger.of(navigator.context).showSnackBar(
-          SnackBar(content: Text('$title\n$body')),
-        );
-      });
-    } catch (e) {
-      debugPrint('onMessage handler error: $e');
-    }
-  });
+  } catch (e) {
+    debugPrint('Notification Service Init Error: $e');
+  }
 
   // Log recruiter creds if available (Debug only)
   try {
@@ -187,8 +99,6 @@ void main() async {
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    // Return a simple Scaffold instead of a nested MaterialApp to avoid
-    // creating another Navigator (which can cause GlobalKey conflicts).
     return Scaffold(
       appBar: AppBar(title: const Text('Error')),
       body: Padding(
@@ -213,12 +123,11 @@ void main() async {
   runApp(const UniversityApp());
 }
 
-// Background handler must be a top-level function
+// Background handler
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   } catch (_) {}
-  // You may want to write the background notification to Firestore or process data
   debugPrint('FCM background message received: ${message.messageId}');
 }
 
@@ -235,9 +144,7 @@ Future<void> _initLocalNotifications() async {
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {
-      // NotificationResponse.payload contains the string payload (notificationId or routing data)
       final payload = response.payload;
-      debugPrint('Local notification tapped, payload: $payload');
       try {
         final ctx = Get.context;
         if (ctx != null && payload != null && payload.isNotEmpty) {
@@ -247,7 +154,6 @@ Future<void> _initLocalNotifications() async {
     },
   );
 
-  // Create Android notification channel
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
     'eduverse_high',
     'Eduverse High Priority',
@@ -302,8 +208,67 @@ class UniversityApp extends StatelessWidget {
         return GetMaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Eduverse',
-          // Kept 'Inter' from your local config. Change to 'Poppins' if you prefer the remote style.
-          theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Inter'),
+          
+          // ==================================================================
+          // 3. LIGHT THEME CONFIGURATION
+          // ==================================================================
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.light,
+            primaryColor: kPrimaryColor, // Uses theme_colors.dart
+            scaffoldBackgroundColor: kBackgroundColor,
+            fontFamily: 'Inter',
+
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: kPrimaryColor,
+              primary: kPrimaryColor,
+              secondary: kSecondaryColor,
+              surface: kWhiteColor,
+              background: kBackgroundColor,
+              onBackground: kDarkTextColor,
+            ),
+
+            appBarTheme: const AppBarTheme(
+              backgroundColor: kWhiteColor,
+              foregroundColor: kDarkTextColor,
+              elevation: 0,
+              centerTitle: true,
+            ),
+            
+            cardTheme: CardThemeData(
+              color: kWhiteColor,
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+
+          // ==================================================================
+          // 4. DARK THEME CONFIGURATION
+          // ==================================================================
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            primaryColor: kPrimaryColor,
+            scaffoldBackgroundColor: kDarkBackgroundColor, // Uses theme_colors.dart
+            fontFamily: 'Inter',
+
+            colorScheme: ColorScheme.dark(
+              primary: kPrimaryColor,
+              secondary: kSecondaryColor,
+              surface: kDarkBackgroundColor.withOpacity(0.8),
+              background: kDarkBackgroundColor,
+              onBackground: kWhiteColor,
+            ),
+
+            appBarTheme: const AppBarTheme(
+              backgroundColor: kDarkBackgroundColor,
+              foregroundColor: kWhiteColor,
+              elevation: 0,
+              centerTitle: true,
+            ),
+          ),
+
+          themeMode: ThemeMode.system, 
 
           home: const AuthGate(),
 
@@ -323,17 +288,17 @@ class UniversityApp extends StatelessWidget {
             GetPage(name: '/student-placement', page: () => const StudentPlacementScreen()),
             GetPage(name: '/recruiter-dashboard', page: () => const RecruiterAdminPanel()),
 
-            // Faculty Module (Preserved)
+            // Faculty Module
             GetPage(name: '/faculty-dashboard', page: () => const FacultyDashboardScreen()),
             GetPage(name: '/faculty-connect', page: () => const MainNavigationScreen()),
 
             GetPage(name: '/profile', page: () => const ProfileScreen()),
 
-            // --- ADDED ANNOUNCEMENTS ROUTES HERE ---
+            // Announcements Routes
             GetPage(name: '/announcements', page: () => const StudentAnnouncementFeed()),
-            // alias route (used by dashboard tile)
             GetPage(name: '/student_announcements_view', page: () => const StudentAnnouncementFeed()),
-            // Notifications
+            
+            // Notifications Routes
             GetPage(
               name: '/notifications',
               page: () {
@@ -343,7 +308,7 @@ class UniversityApp extends StatelessWidget {
                   universityId: args?['universityId'] ?? '',
                 );
               },
-            ), // navigator will supply params when used
+            ),
             GetPage(
               name: '/notification_settings',
               page: () {
@@ -358,7 +323,7 @@ class UniversityApp extends StatelessWidget {
   }
 }
 
-// AuthGate with Role-Based Routing (Preserved)
+// AuthGate (Preserved)
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
   
@@ -375,11 +340,8 @@ class AuthGate extends StatelessWidget {
           final userData = snapshot.data!.data() as Map<String, dynamic>?;
           final role = userData?['role'] ?? 'student';
 
-            // Route based on role
             if (role == 'faculty') return const FacultyDashboardScreen();
             if (role == 'recruiter') return const RecruiterAdminPanel();
-            // Keep super_admin on AdminDashboard; route regular university admins
-            // to the main HomeDashboard by default.
             if (role == 'super_admin') return const AdminDashboard();
             if (role == 'admin') return user.emailVerified ? const HomeDashboard() : const VerifyEmailView();
 

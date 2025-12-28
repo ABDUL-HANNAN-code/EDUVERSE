@@ -5,13 +5,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:reclaimify/theme_colors.dart';
 
-// Color Palette
-const Color kPrimaryColor = Color(0xFF6C63FF);
-const Color kSecondaryColor = Color(0xFF4A90E2);
-const Color kBackgroundColor = Color(0xFFF5F7FA);
-const Color kWhiteColor = Colors.white;
-const Color kDarkTextColor = Color(0xFF2D3142);
+// // Color Palette
+// const Color kPrimaryColor = Color(0xFF6C63FF);
+// const Color kSecondaryColor = Color(0xFF4A90E2);
+// const Color kBackgroundColor = Color(0xFFF5F7FA);
+// const Color kWhiteColor = Colors.white;
+// const Color kDarkTextColor = Color(0xFF2D3142);
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
