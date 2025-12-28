@@ -18,6 +18,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -28,7 +29,8 @@ android {
         applicationId = "com.example.mad_project"
 
         // 🔧 FIX 2: cloud_functions requires minSdk 23
-        minSdk = flutter.minSdkVersion
+        // Set explicit minSdk to 23 to satisfy Firebase / cloud_functions
+        minSdk = 23
 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -45,4 +47,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Enables use of newer java APIs on older Android devices via desugaring
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:1.2.2")
 }

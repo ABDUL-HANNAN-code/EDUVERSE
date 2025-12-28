@@ -44,7 +44,7 @@ dependencies:
   uuid: ^4.5.1
   shared_preferences: ^2.3.2
   audioplayers: ^6.5.0     # Significant updates from 6.0
-  vibration: ^1.9.0        # Checked compatibility
+  vibration: ^3.1.5        # Updated to embedding-v2 compatible version
   intl: ^0.19.0            # Standard for 2025
   provider: ^6.1.2
   image: ^4.3.0
