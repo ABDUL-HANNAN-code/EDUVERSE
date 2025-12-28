@@ -7,6 +7,9 @@ import '../controllers/complaint_controller.dart';
 import '../models/complaint_model.dart';
 import 'create_complaint_screen.dart';
 
+// --- IMPORT GLOBAL THEME ---
+import '../../theme_colors.dart';
+
 class StudentComplaintView extends StatelessWidget {
   StudentComplaintView({Key? key}) : super(key: key);
 
@@ -14,43 +17,49 @@ class StudentComplaintView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme Colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = getAppBackgroundColor(context);
+    final appBarColor = isDark ? kDarkBackgroundColor : kWhiteColor;
+    final fgColor = getAppTextColor(context);
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: bgColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black87,
-        title: const Text(
+        backgroundColor: appBarColor,
+        foregroundColor: fgColor,
+        title: Text(
           'My Reports',
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 22,
+            color: fgColor,
           ),
         ),
+        iconTheme: IconThemeData(color: fgColor),
       ),
       body: Column(
         children: [
-          _buildStatisticsHeader(),
+          _buildStatisticsHeader(context),
           const SizedBox(height: 16),
           Expanded(
             child: Obx(() {
               if (controller.isLoading.value && controller.complaints.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: CircularProgressIndicator(color: kPrimaryColor));
               }
 
               if (controller.complaints.isEmpty) {
-                return _buildEmptyState();
+                return _buildEmptyState(context);
               }
 
               return ListView.separated(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: controller.complaints.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final complaint = controller.complaints[index];
-                  return _buildComplaintCard(complaint);
+                  return _buildComplaintCard(context, complaint);
                 },
               );
             }),
@@ -60,14 +69,14 @@ class StudentComplaintView extends StatelessWidget {
       floatingActionButton: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+            colors: [kSecondaryColor, kPrimaryColor],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF667EEA).withOpacity(0.3),
+              color: kPrimaryColor.withOpacity(0.3),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -77,14 +86,14 @@ class StudentComplaintView extends StatelessWidget {
           onPressed: () => Get.to(() => const CreateComplaintScreen()),
           backgroundColor: Colors.transparent,
           elevation: 0,
-          icon: const Icon(Icons.add),
-          label: const Text('New Report'),
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text('New Report', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
       ),
     );
   }
 
-  Widget _buildStatisticsHeader() {
+  Widget _buildStatisticsHeader(BuildContext context) {
     return Obx(() {
       final stats = controller.statistics;
       return Container(
@@ -92,14 +101,14 @@ class StudentComplaintView extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+            colors: [kSecondaryColor, kPrimaryColor],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF667EEA).withOpacity(0.3),
+              color: kPrimaryColor.withOpacity(0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -177,14 +186,25 @@ class StudentComplaintView extends StatelessWidget {
     );
   }
 
-  Widget _buildComplaintCard(ComplaintModel complaint) {
+  Widget _buildComplaintCard(BuildContext context, ComplaintModel complaint) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // ✅ FIX: Transparent Light Card in Dark Mode
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.white70 : Colors.grey[600];
+    
+    // For popup menu background (solid color needed for readability)
+    final menuColor = isDark ? kDarkBackgroundColor : Colors.white;
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
+          // Subtle shadow only in light mode, or very faint in dark mode
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.0 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -193,7 +213,6 @@ class StudentComplaintView extends StatelessWidget {
       child: IntrinsicHeight(
         child: Row(
           children: [
-            // Colored urgency strip
             Container(
               width: 6,
               decoration: BoxDecoration(
@@ -215,10 +234,10 @@ class StudentComplaintView extends StatelessWidget {
                         Expanded(
                           child: Text(
                             complaint.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                              color: textColor,
                             ),
                           ),
                         ),
@@ -226,13 +245,20 @@ class StudentComplaintView extends StatelessWidget {
                         _buildStatusBadge(complaint.status),
                         const SizedBox(width: 8),
                         PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert, color: subTextColor),
+                          color: menuColor, // Solid background for menu
                           onSelected: (v) async {
                             if (v == 'delete') {
                               final confirm = await Get.defaultDialog<bool>(
                                 title: 'Confirm Delete',
+                                titleStyle: TextStyle(color: isDark ? Colors.white : Colors.black),
                                 middleText: 'Delete this complaint?',
+                                middleTextStyle: TextStyle(color: subTextColor),
+                                backgroundColor: menuColor,
                                 textConfirm: 'Delete',
                                 textCancel: 'Cancel',
+                                confirmTextColor: Colors.white,
+                                buttonColor: Colors.red,
                                 onConfirm: () => Get.back(result: true),
                                 onCancel: () => Get.back(result: false),
                               );
@@ -254,16 +280,16 @@ class StudentComplaintView extends StatelessWidget {
                     if (complaint.isAnonymous) ...[
                       const SizedBox(height: 8),
                       Row(
-                        children: const [
+                        children: [
                           Icon(Icons.visibility_off,
-                              size: 14, color: Colors.grey),
-                          SizedBox(width: 6),
+                              size: 14, color: subTextColor),
+                          const SizedBox(width: 6),
                           Text(
                             'Submitted anonymously',
                             style: TextStyle(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color: Colors.grey,
+                              color: subTextColor,
                             ),
                           ),
                         ],
@@ -275,21 +301,21 @@ class StudentComplaintView extends StatelessWidget {
                         Icon(
                           _getCategoryIcon(complaint.category),
                           size: 16,
-                          color: Colors.grey[600],
+                          color: subTextColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           complaint.category.displayName,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[600],
+                            color: subTextColor,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Icon(
                           Icons.access_time,
                           size: 16,
-                          color: Colors.grey[600],
+                          color: subTextColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -297,7 +323,7 @@ class StudentComplaintView extends StatelessWidget {
                               .format(complaint.createdAt),
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[600],
+                            color: subTextColor,
                           ),
                         ),
                       ],
@@ -307,7 +333,7 @@ class StudentComplaintView extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: isDark ? Colors.blue.withOpacity(0.15) : Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -315,7 +341,7 @@ class StudentComplaintView extends StatelessWidget {
                             Icon(
                               Icons.admin_panel_settings,
                               size: 18,
-                              color: Colors.blue.shade700,
+                              color: isDark ? Colors.blue.shade200 : Colors.blue.shade700,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -323,7 +349,7 @@ class StudentComplaintView extends StatelessWidget {
                                 complaint.adminReply!,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.blue.shade900,
+                                  color: isDark ? Colors.blue.shade100 : Colors.blue.shade900,
                                 ),
                               ),
                             ),
@@ -377,7 +403,12 @@ class StudentComplaintView extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.grey[700];
+    final subTextColor = isDark ? Colors.white70 : Colors.grey[500];
+    final iconBg = isDark ? Colors.white10 : Colors.grey[200];
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -385,7 +416,7 @@ class StudentComplaintView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: iconBg,
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -400,7 +431,7 @@ class StudentComplaintView extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
+              color: textColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -408,7 +439,7 @@ class StudentComplaintView extends StatelessWidget {
             'Tap the button below to submit your first report',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: subTextColor,
             ),
             textAlign: TextAlign.center,
           ),

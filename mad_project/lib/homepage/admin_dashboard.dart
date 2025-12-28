@@ -5,6 +5,7 @@ import 'package:flutter/services.dart'; // Added for Clipboard
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart'; // Added for opening Email App
 import '../shared.dart';
+import 'package:reclaimify/theme_colors.dart';
 import '../timetable/timetable_service.dart';
 import '../marketplace_admin_list.dart';
 import '../student_marketplace.dart';
@@ -302,8 +303,14 @@ class _AdminDashboardState extends State<AdminDashboard>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
+        // Theme-aware AppBar: white in light mode, dark background in dark mode
+        backgroundColor: isDark ? kDarkBackgroundColor : Colors.white,
+        iconTheme: IconThemeData(color: isDark ? kLightTextColor : kPrimaryColor),
+        elevation: 1,
         leading: Navigator.canPop(context)
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -320,16 +327,22 @@ class _AdminDashboardState extends State<AdminDashboard>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_getContextTitle(), style: const TextStyle(fontSize: 16)),
+            Text(
+              _getContextTitle(),
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? kLightTextColor : kPrimaryColor,
+              ),
+            ),
             Text(
               selectedShift == 'morning' ? 'Morning Shift' : 'Evening Shift',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w300),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w300,
+                  color: isDark ? Colors.white70 : Colors.grey),
             ),
           ],
         ),
-        backgroundColor: isSuperAdmin
-            ? Colors.purple
-            : (isUniversityAdmin ? Colors.indigo : Colors.teal),
         actions: [
           Builder(
             builder: (ctx) => IconButton(
@@ -353,6 +366,9 @@ class _AdminDashboardState extends State<AdminDashboard>
         ],
         bottom: TabBar(
           controller: _tabController,
+          labelColor: kPrimaryColor,
+          unselectedLabelColor: isDark ? Colors.white70 : Colors.grey,
+          indicatorColor: kPrimaryColor,
           tabs: [
             const Tab(icon: Icon(Icons.calendar_month), text: "Timetable"),
             const Tab(icon: Icon(Icons.people), text: "Manage Users"),

@@ -1,14 +1,18 @@
 // File: lib/modules/placement/screens/student_placement_screen.dart
-// Updated Student Placement Screen: Fixed Upload Error, Removed Logout, Added Button Actions
+// Updated: Base64 Resume Upload (No Storage Bucket required) & Size Limit Notifications
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:io' show File;
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math';
+import 'dart:convert'; // Required for base64Encode
+import 'dart:typed_data';
+
+// --- IMPORT GLOBAL THEME ---
+import 'package:reclaimify/theme_colors.dart';
 
 // ==================== MODELS ====================
 
@@ -304,28 +308,22 @@ class StudentFirestoreService {
           .get();
 
       if (existingApplication.docs.isNotEmpty) {
-        print('DEBUG: Already applied');
         return {
           'success': false,
           'message': 'You have already applied for this job.'
         };
       }
 
-      print('DEBUG: Creating new application document');
-      print('DEBUG: Application data: ${application.toMap()}');
+      // Check if resumeUrl is a huge base64 string and warn log (optional)
+      // We still store it in applications collection.
+      
+      await _firestore.collection('applications').add(application.toMap());
 
-      DocumentReference docRef =
-          await _firestore.collection('applications').add(application.toMap());
-      print('DEBUG: Application created with ID: ${docRef.id}');
-
-      print(
-          'DEBUG: Incrementing applicants count for job: ${application.jobId}');
       await _firestore
           .collection('jobs')
           .doc(application.jobId)
           .update({'applicantsCount': FieldValue.increment(1)});
 
-      print('DEBUG: Application successful!');
       return {
         'success': true,
         'message': 'Application submitted successfully!'
@@ -459,13 +457,18 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+    final textColor = getAppTextColor(context);
+    final inputFillColor = isDark ? Colors.white.withOpacity(0.05) : const Color(0xFFF5F5F7);
+
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
+            colors: [kDarkBackgroundColor, kPrimaryColor],
           ),
         ),
         child: SafeArea(
@@ -478,13 +481,13 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardColor,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(
                       Icons.school,
                       size: 60,
-                      color: Color(0xFF5E2686),
+                      color: kPrimaryColor,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -511,7 +514,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardColor,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -528,6 +531,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                           if (_isSignUp) ...[
                             TextFormField(
                               controller: _nameController,
+                              style: TextStyle(color: textColor),
                               decoration: InputDecoration(
                                 labelText: 'Full Name',
                                 prefixIcon: const Icon(Icons.person_outline),
@@ -535,7 +539,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFFF5F5F7),
+                                fillColor: inputFillColor,
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -547,6 +551,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(
                               value: _selectedUniversity,
+                              dropdownColor: isDark ? kDarkBackgroundColor : kWhiteColor,
                               decoration: InputDecoration(
                                 labelText: 'University',
                                 prefixIcon: const Icon(Icons.school_outlined),
@@ -554,7 +559,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 filled: true,
-                                fillColor: const Color(0xFFF5F5F7),
+                                fillColor: inputFillColor,
                               ),
                               items: [
                                 'Air University',
@@ -565,7 +570,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                               ].map((String value) {
                                 return DropdownMenuItem<String>(
                                   value: value,
-                                  child: Text(value),
+                                  child: Text(value, style: TextStyle(color: textColor)),
                                 );
                               }).toList(),
                               onChanged: (String? newValue) {
@@ -579,6 +584,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
+                            style: TextStyle(color: textColor),
                             decoration: InputDecoration(
                               labelText: 'Email',
                               prefixIcon: const Icon(Icons.email_outlined),
@@ -586,7 +592,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               filled: true,
-                              fillColor: const Color(0xFFF5F5F7),
+                              fillColor: inputFillColor,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -602,6 +608,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
+                            style: TextStyle(color: textColor),
                             decoration: InputDecoration(
                               labelText: 'Password',
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -621,7 +628,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               filled: true,
-                              fillColor: const Color(0xFFF5F5F7),
+                              fillColor: inputFillColor,
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -640,7 +647,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _handleAuth,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF5E2686),
+                                backgroundColor: kPrimaryColor,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -677,7 +684,7 @@ class _StudentLoginScreenState extends State<StudentLoginScreen> {
                                   ? 'Already have an account? Sign In'
                                   : 'New student? Create Account',
                               style: const TextStyle(
-                                color: Color(0xFF5E2686),
+                                color: kPrimaryColor,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -727,6 +734,9 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
     }
   }
 
+  // -------------------------------------------------------------
+  // REVISED UPLOAD HANDLER: PURE FIRESTORE (BASE64) NO STORAGE
+  // -------------------------------------------------------------
   Future<void> _uploadResumeHandler() async {
     var user = _authService.currentUser;
     if (user == null) {
@@ -734,8 +744,10 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
         context,
         MaterialPageRoute(builder: (context) => const StudentLoginScreen()),
       );
+      if (!mounted) return;
       user = FirebaseAuth.instance.currentUser;
       if (user == null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Sign in required to upload resume')),
         );
@@ -743,132 +755,164 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
       }
     }
 
+    final String uid = user!.uid;
+
     try {
+      // 1. Pick File - Force withData: true to get bytes for Base64 conversion
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
-        withData: kIsWeb,
+        withData: true, 
       );
 
       if (result == null || result.files.isEmpty) return;
 
       final picked = result.files.first;
-
-      final int sizeBytes = picked.size ?? 0;
+      final int sizeBytes = picked.size;
       final String name = picked.name;
-      final String ext =
-          (picked.extension ?? name.split('.').last).toLowerCase();
-      const int maxBytes = 5 * 1024 * 1024; // 5 MB limit
+      final String ext = (picked.extension ?? name.split('.').last).toLowerCase();
 
-      // Validate format
+      // 2. Validate PDF format
       if (ext != 'pdf') {
-        await showDialog<void>(
-          context: context,
-          builder: (c) => AlertDialog(
-            title: const Text('Invalid format'),
-            content: const Text('Please upload your resume as a PDF file.'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(c), child: const Text('OK')),
-            ],
-          ),
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+             content: Text('Invalid format. Only PDF files are allowed.'),
+             backgroundColor: Colors.red,
+           ),
         );
         return;
       }
 
-      // Show confirmation with size and rules
+      // 3. SIZE CHECK Logic (Free Tier / Firestore Doc Limit)
+      // Firestore doc limit is 1MB. Base64 encoding adds ~33% size.
+      // 700KB file -> ~930KB string. Safety margin: 700KB.
+      const int maxFirestoreBytes = 700 * 1024; // 700 KB
+
+      if (sizeBytes > maxFirestoreBytes) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (c) {
+             final isDark = Theme.of(context).brightness == Brightness.dark;
+             // Ensure dialog text is visible in dark/light mode
+             return AlertDialog(
+              backgroundColor: isDark ? kDarkBackgroundColor : Colors.white,
+              title: Text(
+                'File too large', 
+                style: TextStyle(color: isDark ? Colors.white : Colors.black),
+              ),
+              content: Text(
+                'Due to free tier limitations, resumes must be under 700KB to be stored directly in the database.\n\nYour file: ${_formatBytes(sizeBytes)}',
+                style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c), 
+                  child: const Text('OK', style: TextStyle(color: kPrimaryColor)),
+                ),
+              ],
+            );
+          },
+        );
+        return;
+      }
+
+      // 4. Confirmation Dialog
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('Resume upload'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('File: $name'),
-              const SizedBox(height: 6),
-              Text('Size: ${_formatBytes(sizeBytes)}'),
-              const SizedBox(height: 6),
-              const Text('Allowed format: PDF'),
-              const SizedBox(height: 6),
-              Text('Max size: ${_formatBytes(maxBytes)}'),
-              if (sizeBytes > maxBytes) ...[
-                const SizedBox(height: 8),
-                const Text('This file exceeds the allowed size.',
-                    style: TextStyle(color: Colors.red)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c, false),
-                child: const Text('Cancel')),
-            TextButton(
-              onPressed:
-                  sizeBytes > maxBytes ? null : () => Navigator.pop(c, true),
-              child: const Text('Upload'),
+        builder: (c) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDark ? kDarkBackgroundColor : Colors.white,
+            title: Text(
+              'Upload Resume',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black),
             ),
-          ],
-        ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'File: $name',
+                  style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Size: ${_formatBytes(sizeBytes)}',
+                  style: TextStyle(color: isDark ? Colors.white70 : Colors.black87),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'This will be saved directly to the database.',
+                  style: TextStyle(fontSize: 12, color: isDark ? Colors.grey : Colors.grey[600]),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('Save', style: TextStyle(color: kPrimaryColor)),
+              ),
+            ],
+          );
+        },
       );
 
       if (confirmed != true) return;
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Uploading resume...')),
+        const SnackBar(content: Text('Saving resume...')),
       );
 
-      // FIXED: Use a simple, timestamped filename to prevent object-not-found errors
-      // caused by special characters or path issues on mobile.
-      final String safeFilename = 'resume_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      // 5. Convert to Base64 (The Core Logic for No-Storage Upload)
+      Uint8List? fileBytes = picked.bytes;
       
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('resumes/${user.uid}/$safeFilename');
-
-      UploadTask uploadTask;
-      
-      // FIXED: Metadata is crucial for some devices
-      final metadata = SettableMetadata(
-        contentType: 'application/pdf',
-        customMetadata: {'originalName': name},
-      );
-
-      if (kIsWeb) {
-        final bytes = picked.bytes;
-        if (bytes == null) return;
-        uploadTask = storageRef.putData(bytes, metadata);
-      } else {
-        final path = picked.path;
-        if (path == null) return;
-        // Mobile upload using file path
-        uploadTask = storageRef.putFile(File(path), metadata);
+      // Fallback: If bytes are null (native sometimes), read from path
+      if (fileBytes == null && picked.path != null) {
+        fileBytes = await File(picked.path!).readAsBytes();
       }
 
-      final snapshot = await uploadTask;
-      final url = await snapshot.ref.getDownloadURL();
+      if (fileBytes == null) {
+         throw Exception("Could not read file data. Please try again.");
+      }
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'resumeUrl': url});
+      final String base64Data = base64Encode(fileBytes);
+      final String dataUri = 'data:application/pdf;base64,$base64Data';
+
+      // 6. Update Firestore User Document
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'resumeUrl': dataUri, // Saving the large string directly to Firestore
+        'resumeName': name,
+        'resumeUpdatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
 
       await _loadStudentData();
-
+      
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Resume uploaded successfully!'),
+          content: Text('Resume saved successfully!'),
           backgroundColor: Colors.green,
         ),
       );
+
     } catch (e) {
-      print("Upload Error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Upload failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print("Resume Upload Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving resume: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -880,7 +924,6 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
     return '${size.toStringAsFixed(decimals)} ${suffixes[i]}';
   }
 
-  // --- Helpers for Profile Buttons ---
   void _showComingSoon(BuildContext context, String title) {
     showDialog(
       context: context,
@@ -898,8 +941,13 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Check Theme Mode
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = getAppBackgroundColor(context);
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: bgColor,
       body: _currentIndex == 0
           ? _buildHomeTab()
           : _currentIndex == 1
@@ -912,7 +960,9 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
             _currentIndex = index;
           });
         },
-        selectedItemColor: const Color(0xFF5E2686),
+        selectedItemColor: kPrimaryColor,
+        unselectedItemColor: isDark ? Colors.white70 : Colors.grey,
+        backgroundColor: cardColor,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.work_outline),
@@ -935,13 +985,15 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
   }
 
   Widget _buildHomeTab() {
+    final textColor = getAppTextColor(context);
+
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           expandedHeight: 170,
           floating: false,
           pinned: true,
-          backgroundColor: const Color(0xFF5E2686),
+          backgroundColor: kPrimaryColor,
           elevation: 0,
           title: const Text(
             'Placement & Internships',
@@ -954,20 +1006,24 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
           centerTitle: true,
           flexibleSpace: FlexibleSpaceBar(
             background: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
+                  colors: [kDarkBackgroundColor, kPrimaryColor],
                 ),
               ),
               child: SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      const SizedBox(height: 60),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                        SizedBox(height: 48),
                       Row(
                         children: [
                           Expanded(
@@ -1013,6 +1069,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    ),
                   ),
                 ),
               ),
@@ -1028,7 +1085,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                   child: Text(
                     _studentData!.name[0].toUpperCase(),
                     style: const TextStyle(
-                      color: Color(0xFF5E2686),
+                      color: kPrimaryColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -1047,12 +1104,12 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Available Opportunities',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: textColor,
                       ),
                     ),
                     Container(
@@ -1061,7 +1118,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF5E2686).withOpacity(0.1),
+                        color: kPrimaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Row(
@@ -1069,14 +1126,14 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                           Icon(
                             Icons.verified,
                             size: 14,
-                            color: Color(0xFF5E2686),
+                            color: kPrimaryColor,
                           ),
                           SizedBox(width: 4),
                           Text(
                             'Verified',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF5E2686),
+                              color: kPrimaryColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1158,12 +1215,16 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
   }
 
   Widget _buildApplicationsTab() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+    final textColor = getAppTextColor(context);
+
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           pinned: true,
-          backgroundColor: const Color(0xFF5E2686),
-          title: const Text('My Applications'),
+          backgroundColor: kPrimaryColor,
+          title: const Text('My Applications', style: TextStyle(color: Colors.white)),
         ),
         SliverToBoxAdapter(
           child: _authService.currentUser == null
@@ -1272,12 +1333,13 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
+                              color: cardColor,
                               child: ListTile(
                                 leading: Container(
                                   width: 50,
                                   height: 50,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF5E2686),
+                                    color: kPrimaryColor,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: const Center(
@@ -1287,11 +1349,11 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                                     ),
                                   ),
                                 ),
-                                title: Text(job.title),
+                                title: Text(job.title, style: TextStyle(color: textColor)),
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(job.company),
+                                    Text(job.company, style: TextStyle(color: textColor.withOpacity(0.7))),
                                     const SizedBox(height: 4),
                                     Text(
                                       'Applied: ${_formatDate(app['appliedAt'])}',
@@ -1317,25 +1379,31 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
   }
 
   Widget _buildProfileTab() {
+    final textColor = getAppTextColor(context);
+
     return CustomScrollView(
       slivers: [
         SliverAppBar(
           expandedHeight: 200,
           pinned: true,
           flexibleSpace: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
+                colors: [kDarkBackgroundColor, kPrimaryColor],
               ),
             ),
             child: FlexibleSpaceBar(
               background: SafeArea(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 60),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(height: 48),
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.white,
@@ -1344,7 +1412,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                         style: const TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF5E2686),
+                          color: kPrimaryColor,
                         ),
                       ),
                     ),
@@ -1365,6 +1433,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                       ),
                     ),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -1421,8 +1490,7 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
                   'Help & Support',
                   () => _showComingSoon(context, 'Help & Support'),
                 ),
-                // Logout Removed from Profile
-                const SizedBox(height: 20),
+                SizedBox(height: 20 + MediaQuery.of(context).padding.bottom + 8),
               ],
             ),
           ),
@@ -1432,11 +1500,16 @@ class _StudentPlacementScreenState extends State<StudentPlacementScreen> {
   }
 
   Widget _buildProfileOption(IconData icon, String title, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+    final textColor = getAppTextColor(context);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: cardColor, 
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF5E2686)),
-        title: Text(title),
+        leading: Icon(icon, color: kPrimaryColor),
+        title: Text(title, style: TextStyle(color: textColor)),
         trailing: const Icon(Icons.chevron_right),
         onTap: onTap,
       ),
@@ -1505,20 +1578,27 @@ class StudentJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+    
+    final textColor = getAppTextColor(context);
+    final secondaryTextColor = isDark ? Colors.white70 : Colors.grey[600];
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 2),
-            ),
+            if (!isDark)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 2),
+              ),
           ],
         ),
         child: Row(
@@ -1527,7 +1607,7 @@ class StudentJobCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
+                color: isDark ? Colors.white10 : const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Center(
@@ -1550,10 +1630,10 @@ class StudentJobCard extends StatelessWidget {
                     job.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1563,7 +1643,7 @@ class StudentJobCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: secondaryTextColor,
                       fontWeight: FontWeight.w400,
                     ),
                   ),
@@ -1573,7 +1653,7 @@ class StudentJobCard extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 13,
-                        color: Colors.grey[600],
+                        color: secondaryTextColor,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -1583,7 +1663,7 @@ class StudentJobCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: secondaryTextColor,
                           ),
                         ),
                       ),
@@ -1598,15 +1678,15 @@ class StudentJobCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: isDark ? Colors.white10 : Colors.grey[100],
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           job.isRemote ? 'Remote' : 'On-site',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF1A1A1A),
+                            color: textColor,
                           ),
                         ),
                       ),
@@ -1618,17 +1698,17 @@ class StudentJobCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey[100],
+                            color: isDark ? Colors.white10 : Colors.grey[100],
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             job.salary,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: Color(0xFF1A1A1A),
+                              color: textColor,
                             ),
                           ),
                         ),
@@ -1689,7 +1769,7 @@ class StudentJobCard extends StatelessWidget {
                     icon: Icon(
                       isBookmarked ? Icons.bookmark : Icons.bookmark_border,
                       color: isBookmarked
-                          ? const Color(0xFF5E2686)
+                          ? kPrimaryColor
                           : Colors.grey[400],
                       size: 22,
                     ),
@@ -1758,7 +1838,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   Future<void> _applyForJob() async {
     setState(() => _isLoading = true);
 
-    // ALWAYS fetch fresh student data to get latest resume status
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       setState(() => _isLoading = false);
@@ -1766,6 +1845,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
         context,
         MaterialPageRoute(builder: (context) => const StudentLoginScreen()),
       );
+      if (!mounted) return;
       setState(() => _isLoading = true);
       final newUser = FirebaseAuth.instance.currentUser;
       if (newUser == null) {
@@ -1777,33 +1857,17 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       }
     }
 
-    // Fetch fresh student data from Firestore
-    print('=================================================');
-    print('DEBUG: Fetching fresh student data for user: ${user!.uid}');
-    final student = await StudentAuthService().getStudentData(user.uid);
+    final student = await StudentAuthService().getStudentData(user!.uid);
     if (student == null) {
       setState(() => _isLoading = false);
-      print('DEBUG ERROR: Student profile not found');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Student profile not found')),
       );
       return;
     }
 
-    print('DEBUG: Student Data Retrieved:');
-    print('  Name: ${student.name}');
-    print('  Email: ${student.email}');
-    print('  University: ${student.university}');
-    print('  Resume URL: ${student.resumeUrl}');
-    print('  Resume URL is null: ${student.resumeUrl == null}');
-    print('  Resume URL is empty: ${student.resumeUrl?.isEmpty ?? true}');
-    print('=================================================');
-
-    // RESUME VALIDATION: Check if student has uploaded a resume
     if (student.resumeUrl == null || student.resumeUrl!.isEmpty) {
       setState(() => _isLoading = false);
-
-      print('DEBUG: RESUME CHECK FAILED - No resume found!');
 
       final shouldUpload = await showDialog<bool>(
         context: context,
@@ -1813,7 +1877,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.description_outlined,
-                  size: 64, color: Color(0xFF5E2686)),
+                  size: 64, color: kPrimaryColor),
               SizedBox(height: 16),
               Text(
                 'You need to upload your resume before applying to jobs.',
@@ -1829,9 +1893,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5E2686),
+                backgroundColor: kPrimaryColor,
               ),
-              child: const Text('Upload Resume'),
+              child: const Text('Upload Resume', style: TextStyle(color: Colors.white),),
             ),
           ],
         ),
@@ -1839,7 +1903,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 
       if (shouldUpload == true) {
         Navigator.pop(context);
-        // The parent screen will handle resume upload through profile tab
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Please go to Profile tab to upload your resume'),
@@ -1849,16 +1912,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       }
       return;
     }
-
-    print(
-        'DEBUG: RESUME CHECK PASSED - Resume URL exists: ${student.resumeUrl}');
-
-    // Create application with all required fields
-    print('DEBUG: Creating application with:');
-    print('  jobId: ${widget.job.id}');
-    print('  studentId: ${student.uid}');
-    print('  recruiterId: ${widget.job.recruiterId}');
-    print('  resumeUrl: ${student.resumeUrl}');
 
     final application = JobApplication(
       jobId: widget.job.id,
@@ -1871,9 +1924,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
     );
 
     final result = await _firestoreService.applyForJob(application);
-
-    print(
-        'DEBUG: Application result: ${result['success']} - ${result['message']}');
 
     setState(() => _isLoading = false);
 
@@ -1891,26 +1941,33 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = getAppBackgroundColor(context);
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : kWhiteColor;
+    final textColor = getAppTextColor(context);
+    final secondaryTextColor = isDark ? Colors.white70 : Colors.grey[700];
+
     return Scaffold(
+      backgroundColor: bgColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 200,
             pinned: true,
             flexibleSpace: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFF2E0D48), Color(0xFF5E2686)],
+                  colors: [kDarkBackgroundColor, kPrimaryColor],
                 ),
               ),
               child: FlexibleSpaceBar(
                 background: SafeArea(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 60),
+                      children: [
+                        SizedBox(height: 48),
                       Container(
                         width: 80,
                         height: 80,
@@ -1924,7 +1981,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                             style: const TextStyle(
                               fontSize: 40,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF5E2686),
+                              color: kPrimaryColor,
                             ),
                           ),
                         ),
@@ -1979,11 +2036,12 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'Description',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -1992,15 +2050,16 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.5,
-                      color: Colors.grey[700],
+                      color: secondaryTextColor,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
+                  Text(
                     'Requirements',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -2009,10 +2068,10 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.5,
-                      color: Colors.grey[700],
+                      color: secondaryTextColor,
                     ),
                   ),
-                  const SizedBox(height: 100),
+                  SizedBox(height: 100 + MediaQuery.of(context).padding.bottom),
                 ],
               ),
             ),
@@ -2022,7 +2081,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
       bottomSheet: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -2039,7 +2098,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               onPressed: _hasApplied || _isLoading ? null : _applyForJob,
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    _hasApplied ? Colors.grey : const Color(0xFF5E2686),
+                    _hasApplied ? Colors.grey : kPrimaryColor,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -2070,26 +2129,29 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   }
 
   Widget _buildInfoChip(IconData icon, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 12,
         vertical: 8,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F7),
+        color: isDark ? Colors.white.withOpacity(0.1) : const Color(0xFFF5F5F7),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: const Color(0xFF5E2686)),
+          Icon(icon, size: 16, color: kPrimaryColor),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white : Colors.black87,
               ),
               overflow: TextOverflow.ellipsis,
             ),

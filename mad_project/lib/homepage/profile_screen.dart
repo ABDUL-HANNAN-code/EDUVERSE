@@ -5,14 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:reclaimify/theme_colors.dart';
 
-// // Color Palette
-// const Color kPrimaryColor = Color(0xFF6C63FF);
-// const Color kSecondaryColor = Color(0xFF4A90E2);
-// const Color kBackgroundColor = Color(0xFFF5F7FA);
-// const Color kWhiteColor = Colors.white;
-// const Color kDarkTextColor = Color(0xFF2D3142);
+// --- IMPORT GLOBAL THEME ---
+// Adjust path if your theme_colors.dart is in a parent folder use '../theme_colors.dart'
+import '../theme_colors.dart'; 
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -58,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'Error',
             'User data not found',
             backgroundColor: Colors.red,
-            colorText: kWhiteColor,
+            colorText: Colors.white,
             snackPosition: SnackPosition.BOTTOM,
           );
         }
@@ -71,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Error',
         'Failed to load user data: $e',
         backgroundColor: Colors.red,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -82,7 +78,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
         _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
-        _darkModeEnabled = prefs.getBool('dark_mode_enabled') ?? false;
+        
+        // Load dark mode state
+        _darkModeEnabled = prefs.getBool('dark_mode_enabled') ?? Get.isDarkMode;
       });
     } catch (e) {
       debugPrint('Failed to load preferences: $e');
@@ -97,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Success',
         'Notification preferences updated',
         backgroundColor: kPrimaryColor,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -106,7 +104,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Error',
         'Failed to save preferences: $e',
         backgroundColor: Colors.red,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -116,11 +114,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('dark_mode_enabled', value);
+      
+      // ✅ FIX: Actually switch the theme
+      Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+
       Get.snackbar(
         'Success',
         'Dark mode preferences updated',
         backgroundColor: kPrimaryColor,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
@@ -129,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Error',
         'Failed to save preferences: $e',
         backgroundColor: Colors.red,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -140,10 +142,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       text: _userData?['name'] ?? '',
     );
 
+    // Dynamic colors for dialog
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Theme.of(context).cardColor : kWhiteColor;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: kWhiteColor,
+        backgroundColor: bgColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -152,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: kDarkTextColor,
+            color: textColor,
           ),
         ),
         content: Column(
@@ -162,7 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               controller: nameController,
               decoration: InputDecoration(
                 labelText: 'Name',
-                labelStyle: GoogleFonts.poppins(color: kDarkTextColor),
+                labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -170,8 +177,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: kPrimaryColor, width: 2),
                 ),
+                filled: true,
+                fillColor: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
               ),
-              style: GoogleFonts.poppins(color: kDarkTextColor),
+              style: GoogleFonts.poppins(color: textColor),
             ),
           ],
         ),
@@ -191,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Error',
                   'Name cannot be empty',
                   backgroundColor: Colors.red,
-                  colorText: kWhiteColor,
+                  colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                 );
                 return;
@@ -211,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Success',
                   'Profile updated successfully',
                   backgroundColor: kPrimaryColor,
-                  colorText: kWhiteColor,
+                  colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                 );
               } catch (e) {
@@ -219,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Error',
                   'Failed to update profile: $e',
                   backgroundColor: Colors.red,
-                  colorText: kWhiteColor,
+                  colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                 );
               }
@@ -232,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             child: Text(
               'Save',
-              style: GoogleFonts.poppins(color: kWhiteColor),
+              style: GoogleFonts.poppins(color: Colors.white),
             ),
           ),
         ],
@@ -249,7 +258,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           'Success',
           'Password reset email sent to ${user.email}',
           backgroundColor: kPrimaryColor,
-          colorText: kWhiteColor,
+          colorText: Colors.white,
           snackPosition: SnackPosition.BOTTOM,
           duration: const Duration(seconds: 3),
         );
@@ -259,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Error',
         'Failed to send password reset email: $e',
         backgroundColor: Colors.red,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -274,7 +283,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'Error',
         'Failed to logout: $e',
         backgroundColor: Colors.red,
-        colorText: kWhiteColor,
+        colorText: Colors.white,
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -286,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'Copied',
       'University ID copied to clipboard',
       backgroundColor: kPrimaryColor,
-      colorText: kWhiteColor,
+      colorText: Colors.white,
       snackPosition: SnackPosition.BOTTOM,
       duration: const Duration(seconds: 2),
     );
@@ -303,13 +312,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme helpers
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final cardColor = Theme.of(context).cardColor;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
+    final appBarFg = Theme.of(context).appBarTheme.foregroundColor;
+
     return Scaffold(
-      backgroundColor: kBackgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: kWhiteColor,
+        backgroundColor: appBarBg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: kDarkTextColor),
+          icon: Icon(Icons.arrow_back, color: appBarFg),
           onPressed: () => Get.back(),
         ),
         title: Text(
@@ -317,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           style: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: kDarkTextColor,
+            color: appBarFg,
           ),
         ),
         centerTitle: true,
@@ -332,23 +349,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   // Profile Header
-                  _buildProfileHeader(),
+                  _buildProfileHeader(cardColor, textColor),
                   const SizedBox(height: 20),
 
                   // Account Information Section
-                  _buildAccountInformation(),
+                  _buildAccountInformation(cardColor, textColor),
                   const SizedBox(height: 16),
 
                   // Settings Section
-                  _buildSettingsSection(),
+                  _buildSettingsSection(cardColor, textColor),
                   const SizedBox(height: 16),
 
                   // Support & Legal Section
-                  _buildSupportSection(),
+                  _buildSupportSection(cardColor, textColor),
                   const SizedBox(height: 16),
 
                   // Logout Button
-                  _buildLogoutButton(),
+                  _buildLogoutButton(cardColor, textColor),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -356,15 +373,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(Color cardColor, Color textColor) {
     final name = _userData?['name'] ?? 'User';
     final email = _userData?['email'] ?? _auth.currentUser?.email ?? 'No email';
 
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
-        color: kWhiteColor,
-        borderRadius: BorderRadius.only(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
@@ -396,11 +413,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: BoxDecoration(
                       color: kPrimaryColor,
                       shape: BoxShape.circle,
-                      border: Border.all(color: kWhiteColor, width: 3),
+                      border: Border.all(color: cardColor, width: 3),
                     ),
                     child: const Icon(
                       Icons.edit,
-                      color: kWhiteColor,
+                      color: Colors.white,
                       size: 16,
                     ),
                   ),
@@ -414,7 +431,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: GoogleFonts.poppins(
               fontSize: 24,
               fontWeight: FontWeight.w600,
-              color: kDarkTextColor,
+              color: textColor,
             ),
           ),
           const SizedBox(height: 4),
@@ -422,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             email,
             style: GoogleFonts.poppins(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: textColor.withOpacity(0.7),
             ),
           ),
         ],
@@ -430,14 +447,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAccountInformation() {
+  Widget _buildAccountInformation(Color cardColor, Color textColor) {
     final role = _userData?['role'] ?? 'N/A';
     final universityId = _userData?['universityId'] ?? 'N/A';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Card(
-        color: kWhiteColor,
+        color: cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -452,7 +469,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 16),
@@ -460,12 +477,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.person_outline,
                 label: 'Role',
                 value: role,
+                textColor: textColor,
               ),
               const Divider(height: 24),
               _buildInfoRow(
                 icon: Icons.badge_outlined,
                 label: 'University ID',
                 value: universityId,
+                textColor: textColor,
                 trailing: IconButton(
                   icon: const Icon(Icons.copy, size: 20, color: kSecondaryColor),
                   onPressed: () => _copyToClipboard(universityId),
@@ -482,6 +501,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
+    required Color textColor,
     Widget? trailing,
   }) {
     return Row(
@@ -496,7 +516,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 label,
                 style: GoogleFonts.poppins(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: textColor.withOpacity(0.6),
                 ),
               ),
               const SizedBox(height: 2),
@@ -505,7 +525,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
             ],
@@ -516,11 +536,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsSection() {
+  Widget _buildSettingsSection(Color cardColor, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Card(
-        color: kWhiteColor,
+        color: cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -536,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kDarkTextColor,
+                    color: textColor,
                   ),
                 ),
               ),
@@ -547,7 +567,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Notifications',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               trailing: Switch(
@@ -568,7 +588,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Dark Mode',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               trailing: Switch(
@@ -589,7 +609,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Change Password',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
@@ -601,11 +621,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSupportSection() {
+  Widget _buildSupportSection(Color cardColor, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Card(
-        color: kWhiteColor,
+        color: cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -621,7 +641,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: kDarkTextColor,
+                    color: textColor,
                   ),
                 ),
               ),
@@ -632,7 +652,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Help & Support',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
@@ -641,7 +661,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Help & Support',
                   'Contact us at support@eduverse.com',
                   backgroundColor: kPrimaryColor,
-                  colorText: kWhiteColor,
+                  colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                 );
               },
@@ -653,7 +673,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Privacy Policy',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
-                  color: kDarkTextColor,
+                  color: textColor,
                 ),
               ),
               trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
@@ -662,7 +682,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Privacy Policy',
                   'Visit our website for more details',
                   backgroundColor: kPrimaryColor,
-                  colorText: kWhiteColor,
+                  colorText: Colors.white,
                   snackPosition: SnackPosition.BOTTOM,
                 );
               },
@@ -673,7 +693,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(Color cardColor, Color textColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
@@ -681,10 +701,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         height: 56,
         child: ElevatedButton(
           onPressed: () {
+            // Dynamic dialog for logout
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final dialogBg = isDark ? Theme.of(context).cardColor : Colors.white;
+            final dialogText = isDark ? Colors.white : kDarkTextColor;
+
             showDialog(
               context: context,
               builder: (context) => AlertDialog(
-                backgroundColor: kWhiteColor,
+                backgroundColor: dialogBg,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -693,14 +718,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: kDarkTextColor,
+                    color: dialogText,
                   ),
                 ),
                 content: Text(
                   'Are you sure you want to logout?',
                   style: GoogleFonts.poppins(
                     fontSize: 15,
-                    color: kDarkTextColor,
+                    color: dialogText,
                   ),
                 ),
                 actions: [
@@ -724,7 +749,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Text(
                       'Logout',
-                      style: GoogleFonts.poppins(color: kWhiteColor),
+                      style: GoogleFonts.poppins(color: Colors.white),
                     ),
                   ),
                 ],
@@ -741,14 +766,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.logout, color: kWhiteColor),
+              const Icon(Icons.logout, color: Colors.white),
               const SizedBox(width: 8),
               Text(
                 'Logout',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: kWhiteColor,
+                  color: Colors.white,
                 ),
               ),
             ],

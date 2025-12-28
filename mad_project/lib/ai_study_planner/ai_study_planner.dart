@@ -35,12 +35,8 @@ import 'package:reclaimify/theme_colors.dart';
 // is explicit and the app can guide the developer/user to configure a valid key.
 const String groqApiKey = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
 
-// Color Palette
-// const Color kPrimaryColor = Color(0xFF6C63FF);
-// const Color kSecondaryColor = Color(0xFF4A90E2);
-// const Color kBackgroundColor = Color(0xFFF5F7FA);
-// const Color kWhiteColor = Colors.white;
-// const Color kDarkTextColor = Color(0xFF2D3142);
+// Note: Colors are now imported from 'package:reclaimify/theme_colors.dart'
+// to ensure consistency across the app (Dark/Light mode support).
 
 // This file is a module (widget set) intended to be embedded inside the
 // main app. It no longer defines its own `main()` or `MaterialApp` to avoid
@@ -1392,12 +1388,12 @@ class StudyPlannerPage extends StatelessWidget {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF2D2557),
+      backgroundColor: getAppBackgroundColor(context),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2557),
+        backgroundColor: getAppBackgroundColor(context),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: getAppTextColor(context)),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(
@@ -1405,13 +1401,13 @@ class StudyPlannerPage extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             fontSize: 20,
-            color: Colors.white,
+            color: getAppTextColor(context),
           ),
         ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            icon: Icon(Icons.settings_outlined, color: getAppTextColor(context)),
               onPressed: () async {
                 await showDialog<void>(
                   context: context,
@@ -1916,7 +1912,7 @@ class TasksCard extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: kWhiteColor,
+            color: getAppCardColor(context),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -1934,7 +1930,7 @@ class TasksCard extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: kDarkTextColor,
+                  color: getAppTextColor(context),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1965,8 +1961,20 @@ class TasksCard extends StatelessWidget {
                               onChanged: (v) => provider.toggleTask(idx),
                             ),
                           ),
-                          title: Text(task.title, style: GoogleFonts.poppins(fontSize: isMobile ? 16 : 14)),
-                          subtitle: Text('${(task.durationSeconds ~/ 60)} min', style: GoogleFonts.poppins(fontSize: isMobile ? 13 : 12)),
+                          title: Text(
+                            task.title, 
+                            style: GoogleFonts.poppins(
+                              fontSize: isMobile ? 16 : 14,
+                              color: getAppTextColor(context),
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${(task.durationSeconds ~/ 60)} min', 
+                            style: GoogleFonts.poppins(
+                              fontSize: isMobile ? 13 : 12,
+                              color: getAppTextColor(context).withOpacity(0.7),
+                            ),
+                          ),
                           tileColor: selected ? kPrimaryColor.withOpacity(0.08) : null,
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -2199,7 +2207,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
         duration: const Duration(milliseconds: 300),
         height: 180,
         decoration: BoxDecoration(
-          color: kWhiteColor,
+          color: getAppCardColor(context),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
@@ -2209,7 +2217,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('AI Assistant is initializing...', style: GoogleFonts.poppins(color: kDarkTextColor)),
+              Text('AI Assistant is initializing...', style: GoogleFonts.poppins(color: getAppTextColor(context))),
               const SizedBox(height: 8),
                   ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor),
@@ -2234,11 +2242,13 @@ class _ChatInterfaceState extends State<ChatInterface> {
         final screenW = MediaQuery.of(context).size.width;
         final bool isNarrow = screenW < 800;
         final double adaptiveHeight = isNarrow ? min(360.0, screenH * 0.38) : min(420.0, screenH * 0.45);
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           height: _isMaximized ? screenH - 80 : adaptiveHeight,
           decoration: BoxDecoration(
-            color: kWhiteColor,
+            color: getAppCardColor(context),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -2268,7 +2278,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: kDarkTextColor,
+                        color: getAppTextColor(context),
                       ),
                     ),
                     const Spacer(),
@@ -2356,7 +2366,9 @@ class _ChatInterfaceState extends State<ChatInterface> {
                           maxWidth: MediaQuery.of(context).size.width * 0.35,
                         ),
                         decoration: BoxDecoration(
-                          color: isUser ? kPrimaryColor : Colors.grey[100],
+                          color: isUser 
+                            ? kPrimaryColor 
+                            : (isDark ? Colors.grey[800] : Colors.grey[100]),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
@@ -2370,7 +2382,7 @@ class _ChatInterfaceState extends State<ChatInterface> {
                           message['content']!,
                           style: GoogleFonts.poppins(
                             fontSize: 14,
-                            color: isUser ? kWhiteColor : kDarkTextColor,
+                            color: isUser ? kWhiteColor : getAppTextColor(context),
                           ),
                         ),
                       ),
@@ -2409,23 +2421,24 @@ class _ChatInterfaceState extends State<ChatInterface> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: Colors.grey[200]!)),
+                  border: Border(top: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[200]!)),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _controller,
+                        style: TextStyle(color: getAppTextColor(context)),
                         decoration: InputDecoration(
                           hintText: 'Type your message...',
-                          hintStyle: GoogleFonts.poppins(fontSize: 14),
+                          hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
+                            borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide(color: Colors.grey[300]!),
+                            borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(30),
@@ -2508,17 +2521,20 @@ class _ChatFullScreenPageState extends State<ChatFullScreenPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: getAppBackgroundColor(context),
       appBar: AppBar(
-        title: Text('AI Assistant', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        backgroundColor: kPrimaryColor,
+        title: Text('AI Assistant', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: getAppTextColor(context))),
+        backgroundColor: getAppBackgroundColor(context),
         actions: [
           IconButton(
-            icon: const Icon(Icons.fullscreen_exit),
+            icon: Icon(Icons.fullscreen_exit, color: getAppTextColor(context)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white),
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
             onPressed: () async {
               final confirm = await showDialog<bool>(
                 context: context,
@@ -2564,12 +2580,17 @@ class _ChatFullScreenPageState extends State<ChatFullScreenPage> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
                           decoration: BoxDecoration(
-                            color: isUser ? kPrimaryColor : Colors.grey[100],
+                            color: isUser 
+                                ? kPrimaryColor 
+                                : (isDark ? Colors.grey[800] : Colors.grey[100]),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
                             message['content']!,
-                            style: GoogleFonts.poppins(fontSize: 14, color: isUser ? kWhiteColor : kDarkTextColor),
+                            style: GoogleFonts.poppins(
+                                fontSize: 14, 
+                                color: isUser ? kWhiteColor : getAppTextColor(context)
+                            ),
                           ),
                         ),
                       );
@@ -2596,17 +2617,18 @@ class _ChatFullScreenPageState extends State<ChatFullScreenPage> {
                   ),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey[200]!))),
+                  decoration: BoxDecoration(border: Border(top: BorderSide(color: isDark ? Colors.grey[800]! : Colors.grey[200]!))),
                   child: Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _controller,
+                          style: TextStyle(color: getAppTextColor(context)),
                           decoration: InputDecoration(
                             hintText: 'Type your message...',
-                            hintStyle: GoogleFonts.poppins(fontSize: 14),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: Colors.grey[300]!)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: Colors.grey[300]!)),
+                            hintStyle: GoogleFonts.poppins(fontSize: 14, color: Colors.grey),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: isDark ? Colors.grey[700]! : Colors.grey[300]!)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: kPrimaryColor)),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           ),
@@ -2641,7 +2663,7 @@ class AnalyticsPanel extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: kWhiteColor,
+            color: getAppCardColor(context),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -2659,7 +2681,7 @@ class AnalyticsPanel extends StatelessWidget {
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: kDarkTextColor,
+                  color: getAppTextColor(context),
                 ),
               ),
               const SizedBox(height: 20),
@@ -2691,7 +2713,7 @@ class AnalyticsPanel extends StatelessWidget {
                                 if ((value - value.toInt()).abs() > 0.001) return const SizedBox();
                                 return Text(
                                   value.toInt().toString(),
-                                  style: GoogleFonts.poppins(fontSize: 10),
+                                  style: GoogleFonts.poppins(fontSize: 10, color: getAppTextColor(context)),
                                 );
                               },
                             ),
@@ -2710,7 +2732,7 @@ class AnalyticsPanel extends StatelessWidget {
                                     padding: const EdgeInsets.only(top: 8.0),
                                     child: Text(
                                       days[intIndex],
-                                      style: GoogleFonts.poppins(fontSize: 10),
+                                      style: GoogleFonts.poppins(fontSize: 10, color: getAppTextColor(context)),
                                     ),
                                   );
                                 }
@@ -2868,7 +2890,7 @@ class ResourcesCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: kWhiteColor,
+          color: getAppCardColor(context),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -2881,7 +2903,7 @@ class ResourcesCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Recommended Resources', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: kDarkTextColor)),
+            Text('Recommended Resources', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: getAppTextColor(context))),
             const SizedBox(height: 16),
             if (resources.isEmpty)
               Text('No recommended resources available.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]))
@@ -2914,7 +2936,14 @@ class ResourcesCard extends StatelessWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                Text(r.title, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: kDarkTextColor)),
+                                Text(
+                                  r.title, 
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13, 
+                                    fontWeight: FontWeight.w600, 
+                                    color: getAppTextColor(context)
+                                  ),
+                                ),
                                 const SizedBox(height: 4),
                                 Text(r.subtitle, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                               ]),

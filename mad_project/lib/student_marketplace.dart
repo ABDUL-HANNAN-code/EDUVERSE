@@ -13,6 +13,9 @@ import 'lost_and_found.dart';
 import 'notifications.dart';
 import 'poster/marketplace_poster_slideshow.dart';
 
+// --- IMPORT GLOBAL THEME ---
+import 'theme_colors.dart';
+
 // Minimal, robust marketplace implementation to restore app compilation.
 
 String formatPrice(dynamic price) {
@@ -54,7 +57,6 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
   }
 
   @override
-  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -62,6 +64,11 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Darker shimmer for dark mode
+    final baseColor = isDark ? Colors.white10 : Colors.grey[300]!;
+    final highlightColor = isDark ? Colors.white24 : Colors.grey[200]!;
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -72,14 +79,14 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
           decoration: BoxDecoration(
             borderRadius: widget.borderRadius,
             gradient: LinearGradient(
-              colors: [Colors.grey[300]!, Colors.grey[200]!, Colors.grey[300]!],
+              colors: [baseColor, highlightColor, baseColor],
               stops: [
                 (val - 0.3).clamp(0.0, 1.0),
                 val.clamp(0.0, 1.0),
                 (val + 0.3).clamp(0.0, 1.0)
               ],
-              begin: Alignment(-1.0, -0.3),
-              end: Alignment(1.0, 0.3),
+              begin: const Alignment(-1.0, -0.3),
+              end: const Alignment(1.0, 0.3),
             ),
           ),
         );
@@ -106,8 +113,9 @@ class MarketplaceService {
         .doc(uniId)
         .collection('marketplace_items')
         .where('status', isEqualTo: 'available');
-    if (category != null && category != 'All')
+    if (category != null && category != 'All') {
       q = q.where('category', isEqualTo: category);
+    }
     return q.snapshots();
   }
 
@@ -180,9 +188,7 @@ class MarketplaceService {
         .snapshots();
   }
 
-  // Collection group query to find marketplace items across all universities
   Stream<QuerySnapshot> getMyItemsAcrossUniversitiesStream(String userId) {
-    // Avoid ordering here to prevent composite-index requirements while debugging.
     return _db
         .collectionGroup('marketplace_items')
         .where('uid', isEqualTo: userId)
@@ -191,12 +197,12 @@ class MarketplaceService {
 
   Stream<QuerySnapshot> getAllItemsAcrossUniversitiesStream(
       {String? category}) {
-    // Avoid ordering here to prevent composite-index requirements while debugging.
     Query q = _db
         .collectionGroup('marketplace_items')
         .where('status', isEqualTo: 'available');
-    if (category != null && category != 'All')
+    if (category != null && category != 'All') {
       q = q.where('category', isEqualTo: category);
+    }
     return q.snapshots();
   }
 
@@ -261,10 +267,6 @@ class MarketplaceService {
         .doc(bannerId)
         .delete();
   }
-
-  // A minimal marketplace entry widget used by other modules.
-  // Keeps signature compatible with calls like `StudentMarketplace()` and
-  // `StudentMarketplace(adminViewUniId: uniId)` from admin screens.
 }
 
 class StudentMarketplace extends StatefulWidget {
@@ -312,9 +314,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
   @override
   void didUpdateWidget(covariant StudentMarketplace oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the parent supplies a different adminViewUniId after mount,
-    // update the resolved uni id so the stream switches from global
-    // to the specific university immediately.
     if (widget.adminViewUniId != oldWidget.adminViewUniId) {
       setState(() {
         _resolvedUniId = widget.adminViewUniId;
@@ -323,9 +322,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
   }
 
   Future<void> _resolveUniId() async {
-    // If `adminViewUniId` was passed, set it immediately so the UI
-    // shows the university-scoped marketplace while we resolve the
-    // current user's profile asynchronously.
     if (widget.adminViewUniId != null && widget.adminViewUniId!.isNotEmpty) {
       _resolvedUniId = widget.adminViewUniId;
     }
@@ -348,9 +344,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
       final data = doc.data() as Map<String, dynamic>?;
       final role = data?['role'] as String? ?? 'student';
 
-      // Prefer explicit adminViewUniId from caller. If not provided, for
-      // admin users prefer `adminScope.uniId` stored on the user doc (used
-      // elsewhere in the app). Fallback to `uniId` field if present.
       String? uniId = widget.adminViewUniId;
       if (uniId == null || uniId.isEmpty) {
         if (data != null &&
@@ -378,21 +371,25 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: bgColor,
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
           SliverAppBar(
             expandedHeight: 180,
             pinned: true,
-            backgroundColor: AppColors.mainColor,
+            backgroundColor: kPrimaryColor,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-              title: Text(
+              title: const Text(
                 'Marketplace',
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -403,7 +400,8 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.mainColor, AppColors.lightMainColor],
+                    // Uses Global Theme Colors
+                    colors: [kPrimaryColor, kSecondaryColor],
                   ),
                 ),
               ),
@@ -422,10 +420,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                     const Icon(Icons.inventory_2_outlined, color: Colors.white),
                 tooltip: 'My Ads',
                 onPressed: () {
-                  // Prefer the resolved `userId` (set during init), but
-                  // fall back to FirebaseAuth directly if necessary. This
-                  // avoids falsely treating logged-in users as anonymous
-                  // while async profile resolution completes.
                   final uid = userId ?? FirebaseAuth.instance.currentUser?.uid;
                   if (uid == null) {
                     MySnackBar().mySnackBar(
@@ -451,8 +445,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
             ],
           ),
 
-          // Debug bar removed: university selection is handled in profile/admin flows.
-
           // Sticky Search Bar
           SliverPersistentHeader(
             pinned: true,
@@ -461,7 +453,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                 onChanged: () => setState(() {})),
           ),
 
-          // Poster slideshow (user-facing) - placed above existing banners
+          // Poster slideshow
           SliverToBoxAdapter(child: MarketplacePosterSlideshow()),
 
           // Banner carousel
@@ -487,25 +479,25 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
           }
           Get.to(() => SellItemView(uniId: _resolvedUniId!));
         },
-        label: const Text('Sell'),
-        icon: const Icon(Icons.add),
-        backgroundColor: AppColors.mainColor,
+        label: const Text('Sell', style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: kPrimaryColor,
       ),
     );
   }
 
-  // Premium banner section (used inside slivers)
+  // Premium banner section
   Widget _buildDefaultBanner() {
     return Container(
       height: 200,
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-            colors: [AppColors.mainColor, AppColors.lightMainColor]),
+            colors: [kPrimaryColor, kSecondaryColor]),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: AppColors.mainColor.withOpacity(0.25),
+              color: kPrimaryColor.withOpacity(0.25),
               blurRadius: 20,
               offset: const Offset(0, 10)),
         ],
@@ -533,8 +525,9 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
     return StreamBuilder<QuerySnapshot>(
       stream: _service.getBannersStream(_resolvedUniId!),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return _buildDefaultBanner();
+        }
         final banners = snapshot.data!.docs;
         return SizedBox(
           height: 220,
@@ -552,6 +545,10 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
   }
 
   Widget _buildCategoryPills() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardTheme.color ?? kWhiteColor;
+    final textColor = isDark ? Colors.white70 : kDarkTextColor;
+
     return SizedBox(
       height: 70,
       child: ListView.builder(
@@ -572,11 +569,11 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? LinearGradient(colors: [
-                          AppColors.mainColor,
-                          AppColors.lightMainColor
+                          kPrimaryColor,
+                          kSecondaryColor
                         ])
                       : null,
-                  color: isSelected ? null : Colors.white,
+                  color: isSelected ? null : cardColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
@@ -588,7 +585,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
                 ),
                 child: Text(category,
                     style: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.darkGrey,
+                        color: isSelected ? Colors.white : textColor,
                         fontWeight:
                             isSelected ? FontWeight.bold : FontWeight.w600)),
               ),
@@ -599,7 +596,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
     );
   }
 
-  // Builds items grid as a sliver
+  // Builds items grid
   Widget _buildItemsGrid() {
     final stream = _resolvedUniId == null
         ? _service.getAllItemsAcrossUniversitiesStream(
@@ -651,7 +648,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
         }
 
         final docs = List<QueryDocumentSnapshot>.from(snapshot.data!.docs);
-        // filter by search
         final items = docs.where((doc) {
           if (_searchController.text.isEmpty) return true;
           final data = doc.data() as Map<String, dynamic>;
@@ -660,11 +656,11 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
               (data['description'] ?? '').toString().toLowerCase().contains(q);
         }).toList();
 
-        if (items.isEmpty)
-          return SliverFillRemaining(
+        if (items.isEmpty) {
+          return const SliverFillRemaining(
               child: Center(child: Text('No items match your search')));
+        }
 
-        // sort by createdAt desc
         items.sort((a, b) {
           final ta = (a.data() as Map<String, dynamic>)['createdAt'];
           final tb = (b.data() as Map<String, dynamic>)['createdAt'];
@@ -750,7 +746,6 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
             onPressed: () async {
               Get.back();
               try {
-                // prefer the explicit uniId passed from the item document; fallback to current resolved/admin view
                 final uni = (uniId.isNotEmpty ? uniId : null) ??
                     _resolvedUniId ??
                     widget.adminViewUniId;
@@ -778,7 +773,7 @@ class _StudentMarketplaceState extends State<StudentMarketplace> {
   }
 }
 
-// Simple image display helper that accepts either a URL or base64 data
+// Simple image display helper
 class MarketplaceImageDisplay extends StatelessWidget {
   final String imageData;
   final double? height;
@@ -797,7 +792,6 @@ class MarketplaceImageDisplay extends StatelessWidget {
     if (imageData.isEmpty) {
       return Container(color: Colors.grey[200], height: height, width: width);
     }
-    // If it looks like a URL
     if (imageData.startsWith('http')) {
       return CachedNetworkImage(
         imageUrl: imageData,
@@ -811,7 +805,6 @@ class MarketplaceImageDisplay extends StatelessWidget {
       );
     }
 
-    // Otherwise assume base64
     try {
       final bytes = base64Decode(imageData);
       return Image.memory(bytes, height: height, width: width, fit: fit);
@@ -821,9 +814,7 @@ class MarketplaceImageDisplay extends StatelessWidget {
   }
 }
 
-// Carousel that accepts a list of image strings (URLs or base64) and
-// shows an autoplaying PageView with dot indicators. Falls back to a
-// single image when the list has one element.
+// Carousel
 class MarketplaceImageCarousel extends StatefulWidget {
   final List<String> images;
   final double? height;
@@ -843,8 +834,7 @@ class MarketplaceImageCarousel extends StatefulWidget {
       _MarketplaceImageCarouselState();
 }
 
-// BannerCarousel: shows a list of banner documents (QueryDocumentSnapshot list)
-// with autoplay, dots, and optional admin delete overlay for the current slide.
+// BannerCarousel
 class BannerCarousel extends StatefulWidget {
   final List<QueryDocumentSnapshot> banners;
   final bool isAdmin;
@@ -953,14 +943,15 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                 icon: const Icon(Icons.delete,
                                     color: Colors.white),
                                 onPressed: () async {
-                                  if (widget.onDelete != null)
+                                  if (widget.onDelete != null) {
                                     await widget.onDelete!(_current);
+                                  }
                                 },
                               ),
                             ),
                           ),
 
-                        // Text overlay (title + description) - ensure captions show on banners
+                        // Text overlay
                         if ((data['title'] ?? '').toString().isNotEmpty ||
                             (data['description'] ?? '').toString().isNotEmpty)
                           Positioned(
@@ -988,7 +979,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                       .isNotEmpty)
                                     Text((data['title'] ?? '').toString(),
                                         style: const TextStyle(
-                                            color: Colors.white,
+                                            color: Colors.black,
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold)),
                                   if ((data['description'] ?? '')
@@ -1060,10 +1051,11 @@ class _MarketplaceImageCarouselState extends State<MarketplaceImageCarousel> {
     _autoplayTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
       if (_isPaused) return;
       final next = (_current + 1) % widget.images.length;
-      if (mounted)
+      if (mounted) {
         _controller.animateToPage(next,
             duration: const Duration(milliseconds: 400),
             curve: Curves.easeInOut);
+      }
     });
   }
 
@@ -1075,9 +1067,10 @@ class _MarketplaceImageCarouselState extends State<MarketplaceImageCarousel> {
   }
 
   Widget _buildImage(String image) {
-    if (image.isEmpty)
+    if (image.isEmpty) {
       return Container(
           color: Colors.grey[200], height: widget.height, width: widget.width);
+    }
     if (image.startsWith('http')) {
       return CachedNetworkImage(
           imageUrl: image,
@@ -1169,17 +1162,24 @@ class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.black12 : Colors.grey[50];
+    final fieldColor = isDark ? Theme.of(context).cardColor : Colors.white;
+    final hintColor = isDark ? Colors.white54 : Colors.grey;
+
     return Container(
-      color: Colors.grey[50],
+      color: bgColor,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: TextField(
         controller: controller,
         onChanged: (_) => onChanged(),
+        style: TextStyle(color: isDark ? Colors.white : Colors.black),
         decoration: InputDecoration(
           hintText: 'Search marketplace...',
-          prefixIcon: const Icon(Icons.search, color: AppColors.mainColor),
+          hintStyle: TextStyle(color: hintColor),
+          prefixIcon: const Icon(Icons.search, color: kPrimaryColor),
           filled: true,
-          fillColor: Colors.white,
+          fillColor: fieldColor,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -1261,6 +1261,12 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
     final isAdmin =
         widget.userRole == 'admin' || widget.userRole == 'super_admin';
 
+    // Dynamic colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardTheme.color ?? Colors.white;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final secondaryText = isDark ? Colors.white54 : Colors.grey[600];
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -1276,7 +1282,7 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -1370,16 +1376,16 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.mainColor,
+                            color: kPrimaryColor,
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           widget.data['title'] ?? '',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.darkGrey,
+                            color: textColor,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -1389,7 +1395,7 @@ class _StaggeredItemCardState extends State<_StaggeredItemCard>
                           widget.data['category'] ?? 'Other',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.smallText,
+                            color: secondaryText,
                           ),
                         ),
                       ],
@@ -1418,11 +1424,16 @@ class MyAdsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = MarketplaceService();
+    // Dynamic colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardTheme.color ?? Colors.white;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final secondaryText = isDark ? Colors.white70 : kDarkTextColor;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Ads'),
-        backgroundColor: AppColors.mainColor,
+        backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -1475,7 +1486,6 @@ class MyAdsView extends StatelessWidget {
           }
 
           final items = List<QueryDocumentSnapshot>.from(snapshot.data!.docs);
-          // Sort client-side by createdAt desc to avoid composite index requirement
           items.sort((a, b) {
             final ta = (a.data() as Map<String, dynamic>)['createdAt'];
             final tb = (b.data() as Map<String, dynamic>)['createdAt'];
@@ -1493,6 +1503,7 @@ class MyAdsView extends StatelessWidget {
               final data = doc.data() as Map<String, dynamic>;
 
               return Card(
+                color: cardColor,
                 margin: const EdgeInsets.only(bottom: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
@@ -1541,10 +1552,10 @@ class MyAdsView extends StatelessWidget {
                             children: [
                               Text(
                                 data['title'] ?? '',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.darkGrey,
+                                  color: textColor,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -1555,14 +1566,14 @@ class MyAdsView extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.mainColor,
+                                  color: kPrimaryColor,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 data['category'] ?? 'Other',
                                 style: TextStyle(
-                                    fontSize: 12, color: AppColors.smallText),
+                                    fontSize: 12, color: secondaryText),
                               ),
                             ],
                           ),
@@ -1572,8 +1583,7 @@ class MyAdsView extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit,
-                                color: AppColors.mainColor),
+                            icon: const Icon(Icons.edit, color: kPrimaryColor),
                             onPressed: () => Get.to(() => EditItemView(
                                   uniId: doc.reference.parent.parent?.id ??
                                       uniId ??
@@ -1752,7 +1762,6 @@ class _SellItemViewState extends State<SellItemView> {
       setState(() => isLoading = false);
 
       if (result.isNotEmpty && !result.toLowerCase().contains('error')) {
-        // Navigate the user to their ads so they can immediately see the new post
         Get.off(() => MyAdsView(uniId: widget.uniId, userId: user.uid));
         MySnackBar().mySnackBar(
           header: 'Success',
@@ -1778,10 +1787,11 @@ class _SellItemViewState extends State<SellItemView> {
 
   @override
   Widget build(BuildContext context) {
+    // Replaced custom BlueButton with standard ElevatedButton for consistency
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sell Item'),
-        backgroundColor: AppColors.mainColor,
+        backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -1815,7 +1825,7 @@ class _SellItemViewState extends State<SellItemView> {
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(20),
                           border:
-                              Border.all(color: AppColors.mainColor, width: 2),
+                              Border.all(color: kPrimaryColor, width: 2),
                         ),
                         child: _imageData == null
                             ? Column(
@@ -1858,21 +1868,27 @@ class _SellItemViewState extends State<SellItemView> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: selectedCategory,
-                      decoration: InputDecoration(
-                        labelText: 'Category',
-                        prefixIcon: const Icon(Icons.category,
-                            color: AppColors.mainColor),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                      ),
-                      items: categories
-                          .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)))
-                          .toList(),
-                      onChanged: (v) => setState(() => selectedCategory = v!),
-                    ),
+                    Builder(builder: (context) {
+                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      final textColor = getAppTextColor(context);
+                      return DropdownButtonFormField<String>(
+                        value: selectedCategory,
+                        style: TextStyle(color: textColor),
+                        dropdownColor: isDark ? kDarkBackgroundColor : kWhiteColor,
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          labelStyle: TextStyle(color: textColor),
+                          prefixIcon: Icon(Icons.category, color: kPrimaryColor),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                          filled: true,
+                          fillColor: isDark ? kDarkBackgroundColor.withOpacity(0.12) : kWhiteColor,
+                        ),
+                        items: categories
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c, style: TextStyle(color: textColor))))
+                            .toList(),
+                        onChanged: (v) => setState(() => selectedCategory = v!),
+                      );
+                    }),
                     const SizedBox(height: 16),
                     const Text('Condition',
                         style: TextStyle(
@@ -1897,16 +1913,27 @@ class _SellItemViewState extends State<SellItemView> {
                     _buildTextField(
                       controller: _phoneController,
                       label: 'Phone Number',
-                      hint: '+923115428907 or 03115428907',
+                      hint: '+923295008120 or 03295008120',
                       icon: Icons.phone,
                       keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 32),
-                    BlueButton(
-                      onPressed: _submitItem,
-                      text: 'Post Item',
+                    SizedBox(
                       width: double.infinity,
                       height: 56,
+                      child: ElevatedButton(
+                        onPressed: _submitItem,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('Post Item',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                      ),
                     ),
                   ],
                 ),
@@ -1924,36 +1951,46 @@ class _SellItemViewState extends State<SellItemView> {
     int maxLines = 1,
     String? Function(String?)? validator,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = getAppTextColor(context);
+    final inputFillColor = isDark ? kDarkBackgroundColor.withOpacity(0.06) : kWhiteColor;
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      style: TextStyle(color: textColor),
       decoration: InputDecoration(
         labelText: label,
+        labelStyle: TextStyle(color: textColor),
         hintText: hint,
-        prefixIcon: Icon(icon, color: AppColors.mainColor),
+        hintStyle: TextStyle(color: textColor.withOpacity(0.6)),
+        prefixIcon: Icon(icon, color: kPrimaryColor),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: inputFillColor,
       ),
       validator: validator ?? (v) => v!.isEmpty ? 'Required' : null,
     );
   }
 
   Widget _buildChoiceChip(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = getAppTextColor(context);
+    final selected = selectedCondition == value;
     return ChoiceChip(
-      label: Text(label),
-      selected: selectedCondition == value,
-      onSelected: (b) => setState(() => selectedCondition = value),
-      selectedColor: AppColors.mainColor.withOpacity(0.2),
-      checkmarkColor: AppColors.mainColor,
-      labelStyle: TextStyle(
-        color: selectedCondition == value
-            ? AppColors.mainColor
-            : AppColors.darkGrey,
-        fontWeight:
-            selectedCondition == value ? FontWeight.bold : FontWeight.normal,
+      label: Text(
+        label,
+        style: TextStyle(
+          color: selected ? kPrimaryColor : textColor,
+          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
+      selected: selected,
+      onSelected: (b) => setState(() => selectedCondition = value),
+      selectedColor: kPrimaryColor.withOpacity(0.12),
+      backgroundColor: isDark ? kDarkBackgroundColor.withOpacity(0.06) : kWhiteColor,
+      checkmarkColor: kPrimaryColor,
     );
   }
 }
@@ -1978,15 +2015,21 @@ class ItemDetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final isOwner = currentUser?.uid == itemData['uid'];
+    
+    // Dynamic theme colors
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = Theme.of(context).cardTheme.color ?? Colors.white;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final secondaryText = isDark ? Colors.white70 : kDarkTextColor;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cardColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 350,
             pinned: true,
-            backgroundColor: AppColors.mainColor,
+            backgroundColor: kPrimaryColor,
             flexibleSpace: FlexibleSpaceBar(
               background: Hero(
                 tag: 'item_$itemId',
@@ -2021,9 +2064,9 @@ class ItemDetailView extends StatelessWidget {
           ),
           SliverToBoxAdapter(
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(32),
                   topRight: Radius.circular(32),
                 ),
@@ -2040,7 +2083,7 @@ class ItemDetailView extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 36,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.mainColor,
+                            color: kPrimaryColor,
                           ),
                         ),
                         const Spacer(),
@@ -2069,50 +2112,50 @@ class ItemDetailView extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(
                       itemData['title'] ?? '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.darkGrey,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Icon(Icons.category,
-                            size: 18, color: AppColors.smallText),
+                            size: 18, color: secondaryText),
                         const SizedBox(width: 6),
                         Text(
                           itemData['category'] ?? 'Other',
                           style: TextStyle(
-                              color: AppColors.smallText, fontSize: 14),
+                              color: secondaryText, fontSize: 14),
                         ),
                         const SizedBox(width: 20),
                         Icon(Icons.person,
-                            size: 18, color: AppColors.smallText),
+                            size: 18, color: secondaryText),
                         const SizedBox(width: 6),
                         Text(
                           itemData['username'] ?? 'Unknown',
                           style: TextStyle(
-                              color: AppColors.smallText, fontSize: 14),
+                              color: secondaryText, fontSize: 14),
                         ),
                       ],
                     ),
                     const SizedBox(height: 32),
-                    const Text(
+                    Text(
                       'Description',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.darkGrey,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       itemData['description'] ?? '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         height: 1.6,
-                        color: AppColors.darkGrey,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 100),
@@ -2127,7 +2170,7 @@ class ItemDetailView extends StatelessWidget {
           ? Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
@@ -2136,47 +2179,58 @@ class ItemDetailView extends StatelessWidget {
                   ),
                 ],
               ),
-              child: BlueButton(
-                onPressed: () async {
-                  final phone = (itemData['phone'] ?? '').toString().trim();
-                  if (phone.isEmpty) {
-                    MySnackBar().mySnackBar(
-                      header: 'Error',
-                      content: 'Phone number not available',
-                      bgColor: Colors.red.shade100,
-                    );
-                    return;
-                  }
-
-                  final waNumber = sanitizePhoneForWhatsApp(phone);
-                  if (waNumber.isEmpty) {
-                    MySnackBar().mySnackBar(
-                      header: 'Error',
-                      content: 'Invalid phone number',
-                      bgColor: Colors.red.shade100,
-                    );
-                    return;
-                  }
-
-                  final waUri = Uri.parse('https://wa.me/$waNumber');
-                  try {
-                    await launchUrl(waUri);
-                  } catch (e) {
-                    final telUri = Uri.parse('tel:+$waNumber');
-                    try {
-                      await launchUrl(telUri);
-                    } catch (e2) {
-                      MySnackBar().mySnackBar(
-                        header: 'Error',
-                        content: 'Could not open contact method',
-                        bgColor: Colors.red.shade100,
-                      );
-                    }
-                  }
-                },
-                text: 'Contact Seller via WhatsApp',
+              child: SizedBox(
                 width: double.infinity,
                 height: 56,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final phone = (itemData['phone'] ?? '').toString().trim();
+                    if (phone.isEmpty) {
+                      MySnackBar().mySnackBar(
+                        header: 'Error',
+                        content: 'Phone number not available',
+                        bgColor: Colors.red.shade100,
+                      );
+                      return;
+                    }
+
+                    final waNumber = sanitizePhoneForWhatsApp(phone);
+                    if (waNumber.isEmpty) {
+                      MySnackBar().mySnackBar(
+                        header: 'Error',
+                        content: 'Invalid phone number',
+                        bgColor: Colors.red.shade100,
+                      );
+                      return;
+                    }
+
+                    final waUri = Uri.parse('https://wa.me/$waNumber');
+                    try {
+                      await launchUrl(waUri);
+                    } catch (e) {
+                      final telUri = Uri.parse('tel:+$waNumber');
+                      try {
+                        await launchUrl(telUri);
+                      } catch (e2) {
+                        MySnackBar().mySnackBar(
+                          header: 'Error',
+                          content: 'Could not open contact method',
+                          bgColor: Colors.red.shade100,
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Contact Seller via WhatsApp',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                ),
               ),
             )
           : null,
@@ -2306,7 +2360,7 @@ class _EditItemViewState extends State<EditItemView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Item'),
-        backgroundColor: AppColors.mainColor,
+        backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -2323,7 +2377,7 @@ class _EditItemViewState extends State<EditItemView> {
                       decoration: InputDecoration(
                         labelText: 'Title',
                         prefixIcon:
-                            const Icon(Icons.title, color: AppColors.mainColor),
+                            const Icon(Icons.title, color: kPrimaryColor),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
@@ -2336,7 +2390,7 @@ class _EditItemViewState extends State<EditItemView> {
                       decoration: InputDecoration(
                         labelText: 'Price (Rs)',
                         prefixIcon: const Icon(Icons.currency_rupee,
-                            color: AppColors.mainColor),
+                            color: kPrimaryColor),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
@@ -2352,7 +2406,7 @@ class _EditItemViewState extends State<EditItemView> {
                       decoration: InputDecoration(
                         labelText: 'Category',
                         prefixIcon: const Icon(Icons.category,
-                            color: AppColors.mainColor),
+                            color: kPrimaryColor),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
@@ -2370,8 +2424,8 @@ class _EditItemViewState extends State<EditItemView> {
                           selected: selectedCondition == 'New',
                           onSelected: (b) =>
                               setState(() => selectedCondition = 'New'),
-                          selectedColor: AppColors.mainColor.withOpacity(0.2),
-                          checkmarkColor: AppColors.mainColor,
+                          selectedColor: kPrimaryColor.withOpacity(0.2),
+                          checkmarkColor: kPrimaryColor,
                         ),
                         const SizedBox(width: 12),
                         ChoiceChip(
@@ -2379,8 +2433,8 @@ class _EditItemViewState extends State<EditItemView> {
                           selected: selectedCondition == 'Used',
                           onSelected: (b) =>
                               setState(() => selectedCondition = 'Used'),
-                          selectedColor: AppColors.mainColor.withOpacity(0.2),
-                          checkmarkColor: AppColors.mainColor,
+                          selectedColor: kPrimaryColor.withOpacity(0.2),
+                          checkmarkColor: kPrimaryColor,
                         ),
                       ],
                     ),
@@ -2391,7 +2445,7 @@ class _EditItemViewState extends State<EditItemView> {
                       decoration: InputDecoration(
                         labelText: 'Description',
                         prefixIcon: const Icon(Icons.description,
-                            color: AppColors.mainColor),
+                            color: kPrimaryColor),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
@@ -2405,18 +2459,29 @@ class _EditItemViewState extends State<EditItemView> {
                         labelText: 'Phone Number',
                         hintText: '+923115428907',
                         prefixIcon:
-                            const Icon(Icons.phone, color: AppColors.mainColor),
+                            const Icon(Icons.phone, color: kPrimaryColor),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16)),
                       ),
                       validator: (v) => v!.isEmpty ? 'Required' : null,
                     ),
                     const SizedBox(height: 24),
-                    BlueButton(
-                      onPressed: _updateItem,
-                      text: 'Update Item',
+                    SizedBox(
                       width: double.infinity,
                       height: 56,
+                      child: ElevatedButton(
+                        onPressed: _updateItem,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryColor,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('Update Item',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                      ),
                     ),
                   ],
                 ),
@@ -2512,7 +2577,7 @@ class _AddBannerViewState extends State<AddBannerView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Banner'),
-        backgroundColor: AppColors.mainColor,
+        backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -2531,7 +2596,7 @@ class _AddBannerViewState extends State<AddBannerView> {
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(20),
                         border:
-                            Border.all(color: AppColors.mainColor, width: 2),
+                            Border.all(color: kPrimaryColor, width: 2),
                       ),
                       child: _imageData == null
                           ? Column(
@@ -2561,17 +2626,28 @@ class _AddBannerViewState extends State<AddBannerView> {
                       labelText: 'Banner Title',
                       hintText: 'e.g., Winter Sale - 50% Off!',
                       prefixIcon:
-                          const Icon(Icons.title, color: AppColors.mainColor),
+                          const Icon(Icons.title, color: kPrimaryColor),
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16)),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  BlueButton(
-                    onPressed: _submitBanner,
-                    text: 'Add Banner',
+                  SizedBox(
                     width: double.infinity,
                     height: 56,
+                    child: ElevatedButton(
+                      onPressed: _submitBanner,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimaryColor,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('Add Banner',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
+                    ),
                   ),
                 ],
               ),

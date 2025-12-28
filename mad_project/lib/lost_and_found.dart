@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 // shared.dart removed from this file to avoid unused-import issues
 import 'auth.dart';
 import 'notifications.dart';
+import 'theme_colors.dart';
 
 // ==========================================
 // PHONE VALIDATION HELPER
@@ -324,9 +325,14 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
   @override
   Widget build(BuildContext context) {
     var user = AuthService().currentUser;
+    // Use theme colors
+    final backgroundColor = getAppBackgroundColor(context);
+    final cardColor = getAppCardColor(context);
+    final textColor = getAppTextColor(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor, // Header background
       body: SafeArea(
         child: Column(
           children: [
@@ -381,9 +387,9 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
             // Content area
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -401,7 +407,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: cardColor,
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
@@ -413,6 +419,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                 ),
                                 child: TextField(
                                   controller: _searchCtrl,
+                                  style: TextStyle(color: textColor),
                                   decoration: InputDecoration(
                                     hintText: 'Search',
                                     hintStyle:
@@ -440,7 +447,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                               child: Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: cardColor,
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
@@ -452,16 +459,17 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                 ),
                                 child: Row(
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Filters',
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
+                                        color: textColor,
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     Icon(Icons.tune,
-                                        size: 18, color: Colors.grey[700]),
+                                        size: 18, color: textColor),
                                   ],
                                 ),
                               ),
@@ -604,12 +612,12 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Recently Reported Items',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1A1A),
+                                color: textColor,
                               ),
                             ),
                             GestureDetector(
@@ -619,7 +627,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2D1B69),
+                                  color: kPrimaryColor,
                                 ),
                               ),
                             ),
@@ -644,9 +652,9 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                             }
                             if (!snapshot.hasData ||
                                 snapshot.data!.docs.isEmpty) {
-                              return const Center(
+                              return Center(
                                 child: Text('No items yet',
-                                    style: TextStyle(color: Colors.grey)),
+                                    style: TextStyle(color: textColor)),
                               );
                             }
 
@@ -681,7 +689,7 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                     width: 140,
                                     margin: const EdgeInsets.only(right: 16),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: cardColor,
                                       borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
@@ -717,10 +725,10 @@ class _LostAndFoundLandingPageState extends State<LostAndFoundLandingPage> {
                                                 data['title'] ?? 'No title',
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w600,
-                                                  color: Color(0xFF1A1A1A),
+                                                  color: textColor,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
@@ -850,8 +858,13 @@ class _PostsListViewState extends State<PostsListView> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = getAppBackgroundColor(context);
+    final cardColor = getAppCardColor(context);
+    final textColor = getAppTextColor(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -900,9 +913,9 @@ class _PostsListViewState extends State<PostsListView> {
             // Content area
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -918,7 +931,7 @@ class _PostsListViewState extends State<PostsListView> {
                           Expanded(
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
@@ -930,6 +943,7 @@ class _PostsListViewState extends State<PostsListView> {
                               ),
                               child: TextField(
                                 controller: _searchCtrl,
+                                style: TextStyle(color: textColor),
                                 decoration: InputDecoration(
                                   hintText: 'Search',
                                   hintStyle: TextStyle(color: Colors.grey[400]),
@@ -953,8 +967,8 @@ class _PostsListViewState extends State<PostsListView> {
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: showFilters
-                                    ? const Color(0xFF2D1B69)
-                                    : Colors.white,
+                                    ? kPrimaryColor
+                                    : cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: [
                                   BoxShadow(
@@ -973,7 +987,7 @@ class _PostsListViewState extends State<PostsListView> {
                                       fontWeight: FontWeight.w500,
                                       color: showFilters
                                           ? Colors.white
-                                          : Colors.black,
+                                          : textColor,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -982,7 +996,7 @@ class _PostsListViewState extends State<PostsListView> {
                                     size: 18,
                                     color: showFilters
                                         ? Colors.white
-                                        : Colors.grey[700],
+                                        : textColor,
                                   ),
                                 ],
                               ),
@@ -999,7 +1013,7 @@ class _PostsListViewState extends State<PostsListView> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: cardColor,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -1012,12 +1026,12 @@ class _PostsListViewState extends State<PostsListView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Category',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF666666),
+                                  color: textColor,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -1036,8 +1050,8 @@ class _PostsListViewState extends State<PostsListView> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? const Color(0xFF2D1B69)
-                                            : const Color(0xFFF5F5F5),
+                                            ? kPrimaryColor
+                                            : (isDark ? Colors.grey[800] : const Color(0xFFF5F5F5)),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -1047,7 +1061,7 @@ class _PostsListViewState extends State<PostsListView> {
                                           fontWeight: FontWeight.w500,
                                           color: isSelected
                                               ? Colors.white
-                                              : Colors.black87,
+                                              : textColor,
                                         ),
                                       ),
                                     ),
@@ -1055,12 +1069,12 @@ class _PostsListViewState extends State<PostsListView> {
                                 }).toList(),
                               ),
                               const SizedBox(height: 16),
-                              const Text(
+                              Text(
                                 'Type',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF666666),
+                                  color: textColor,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -1079,8 +1093,8 @@ class _PostsListViewState extends State<PostsListView> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? const Color(0xFF2D1B69)
-                                            : const Color(0xFFF5F5F5),
+                                            ? kPrimaryColor
+                                            : (isDark ? Colors.grey[800] : const Color(0xFFF5F5F5)),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -1090,7 +1104,7 @@ class _PostsListViewState extends State<PostsListView> {
                                           fontWeight: FontWeight.w500,
                                           color: isSelected
                                               ? Colors.white
-                                              : Colors.black87,
+                                              : textColor,
                                         ),
                                       ),
                                     ),
@@ -1226,7 +1240,7 @@ class _PostsListViewState extends State<PostsListView> {
                                           () => PostDetailView(snap: doc)),
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                          color: cardColor,
                                           borderRadius:
                                               BorderRadius.circular(16),
                                           boxShadow: [
@@ -1269,12 +1283,11 @@ class _PostsListViewState extends State<PostsListView> {
                                                       maxLines: 1,
                                                       overflow:
                                                           TextOverflow.ellipsis,
-                                                      style: const TextStyle(
+                                                      style: TextStyle(
                                                         fontSize: 14,
                                                         fontWeight:
                                                             FontWeight.w600,
-                                                        color:
-                                                            Color(0xFF1A1A1A),
+                                                        color: textColor,
                                                       ),
                                                     ),
                                                     const SizedBox(height: 4),
@@ -1429,8 +1442,12 @@ class _CreatePostViewState extends State<CreatePostView> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = getAppBackgroundColor(context);
+    final cardColor = getAppCardColor(context);
+    final textColor = getAppTextColor(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -1470,9 +1487,9 @@ class _CreatePostViewState extends State<CreatePostView> {
             // Content
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -1491,7 +1508,7 @@ class _CreatePostViewState extends State<CreatePostView> {
                                 height: 200,
                                 width: double.infinity,
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: cardColor,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(color: Colors.grey[300]!),
                                 ),
@@ -1517,12 +1534,12 @@ class _CreatePostViewState extends State<CreatePostView> {
                               ),
                             ),
                             const SizedBox(height: 24),
-                            const Text(
+                            Text(
                               'Type',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1A1A1A),
+                                color: textColor,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -1537,12 +1554,12 @@ class _CreatePostViewState extends State<CreatePostView> {
                                           vertical: 12),
                                       decoration: BoxDecoration(
                                         color: postType == "Found"
-                                            ? const Color(0xFF2D1B69)
-                                            : Colors.white,
+                                            ? kPrimaryColor
+                                            : cardColor,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: postType == "Found"
-                                              ? const Color(0xFF2D1B69)
+                                              ? kPrimaryColor
                                               : Colors.grey[300]!,
                                         ),
                                       ),
@@ -1554,7 +1571,7 @@ class _CreatePostViewState extends State<CreatePostView> {
                                             fontWeight: FontWeight.w600,
                                             color: postType == "Found"
                                                 ? Colors.white
-                                                : Colors.black87,
+                                                : textColor,
                                           ),
                                         ),
                                       ),
@@ -1571,12 +1588,12 @@ class _CreatePostViewState extends State<CreatePostView> {
                                           vertical: 12),
                                       decoration: BoxDecoration(
                                         color: postType == "Lost"
-                                            ? const Color(0xFF2D1B69)
-                                            : Colors.white,
+                                            ? kPrimaryColor
+                                            : cardColor,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: postType == "Lost"
-                                              ? const Color(0xFF2D1B69)
+                                              ? kPrimaryColor
                                               : Colors.grey[300]!,
                                         ),
                                       ),
@@ -1588,7 +1605,7 @@ class _CreatePostViewState extends State<CreatePostView> {
                                             fontWeight: FontWeight.w600,
                                             color: postType == "Lost"
                                                 ? Colors.white
-                                                : Colors.black87,
+                                                : textColor,
                                           ),
                                         ),
                                       ),
@@ -1635,7 +1652,7 @@ class _CreatePostViewState extends State<CreatePostView> {
                               child: ElevatedButton(
                                 onPressed: post,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2D1B69),
+                                  backgroundColor: kPrimaryColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -1671,21 +1688,24 @@ class _CreatePostViewState extends State<CreatePostView> {
     Widget? suffix,
     TextInputType? keyboardType,
   }) {
+    final textColor = getAppTextColor(context);
+    final cardColor = getAppCardColor(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+            color: textColor,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
@@ -1694,6 +1714,7 @@ class _CreatePostViewState extends State<CreatePostView> {
             enabled: enabled,
             maxLines: maxLines,
             keyboardType: keyboardType,
+            style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
@@ -1747,6 +1768,9 @@ class _PostDetailViewState extends State<PostDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = getAppBackgroundColor(context);
+    final textColor = getAppTextColor(context);
+
     final dynamic snap = widget.snap;
     Map<String, dynamic>? data;
     String docId = '';
@@ -1768,7 +1792,7 @@ class _PostDetailViewState extends State<PostDetailView> {
         (currentUserRole == 'uni_admin' && postUni == currentUserUni);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -1829,9 +1853,9 @@ class _PostDetailViewState extends State<PostDetailView> {
             // Content
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -1853,10 +1877,10 @@ class _PostDetailViewState extends State<PostDetailView> {
                           children: [
                             Text(
                               data?['title'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF1A1A1A),
+                                color: textColor,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1894,10 +1918,10 @@ class _PostDetailViewState extends State<PostDetailView> {
                             const SizedBox(height: 20),
                             Text(
                               data?['description'] ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 height: 1.5,
-                                color: Color(0xFF333333),
+                                color: textColor.withOpacity(0.8),
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -1964,7 +1988,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2D1B69),
+                                    backgroundColor: kPrimaryColor,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -2124,8 +2148,10 @@ class _EditPostViewState extends State<EditPostView> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = getAppBackgroundColor(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -2165,9 +2191,9 @@ class _EditPostViewState extends State<EditPostView> {
             // Content
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -2217,7 +2243,7 @@ class _EditPostViewState extends State<EditPostView> {
                               child: ElevatedButton(
                                 onPressed: _updatePost,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2D1B69),
+                                  backgroundColor: kPrimaryColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
@@ -2253,21 +2279,24 @@ class _EditPostViewState extends State<EditPostView> {
     Widget? suffix,
     TextInputType? keyboardType,
   }) {
+    final textColor = getAppTextColor(context);
+    final cardColor = getAppCardColor(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+            color: textColor,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[300]!),
           ),
@@ -2276,6 +2305,7 @@ class _EditPostViewState extends State<EditPostView> {
             enabled: enabled,
             maxLines: maxLines,
             keyboardType: keyboardType,
+            style: TextStyle(color: textColor),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
@@ -2300,9 +2330,12 @@ class ProfileView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var user = AuthService().currentUser!;
+    final backgroundColor = getAppBackgroundColor(context);
+    final cardColor = getAppCardColor(context);
+    final textColor = getAppTextColor(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF2D1B69),
+      backgroundColor: kPrimaryColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -2342,9 +2375,9 @@ class ProfileView extends StatelessWidget {
             // Content
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.only(
+                decoration: BoxDecoration(
+                  color: backgroundColor,
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(24),
                     topRight: Radius.circular(24),
                   ),
@@ -2361,10 +2394,10 @@ class ProfileView extends StatelessWidget {
                     const SizedBox(height: 16),
                     Text(
                       user.email ?? "",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -2401,13 +2434,13 @@ class ProfileView extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
+                        children: [
                           Text(
                             'My Posts',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1A1A1A),
+                              color: textColor,
                             ),
                           ),
                         ],
@@ -2473,7 +2506,7 @@ class ProfileView extends StatelessWidget {
                                     Get.to(() => PostDetailView(snap: doc)),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: cardColor,
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: [
                                       BoxShadow(
@@ -2497,9 +2530,10 @@ class ProfileView extends StatelessWidget {
                                     ),
                                     title: Text(
                                       data['title'] ?? '',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
+                                        color: textColor,
                                       ),
                                     ),
                                     subtitle: Padding(

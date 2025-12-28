@@ -11,6 +11,10 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// --- IMPORT GLOBAL THEME ---
+// (Adjust path if needed, e.g., 'package:your_app_name/theme_colors.dart')
+import '../../theme_colors.dart';
+
 void main() {
   runApp(const EduverseStudentApp());
 }
@@ -26,13 +30,33 @@ class EduverseStudentApp extends StatelessWidget {
     return GetMaterialApp(
       title: 'Eduverse - Student Portal',
       debugShowCheckedModeBanner: false,
+      // Use the global theme definitions if available via Get/Global context, 
+      // otherwise define local defaults matching theme_colors.dart
       theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF546EDB),
-        scaffoldBackgroundColor: const Color(0xFF2D2658),
-        cardColor: Colors.white,
+        brightness: Brightness.light,
+        primaryColor: kPrimaryColor,
+        scaffoldBackgroundColor: kBackgroundColor,
+        cardColor: kWhiteColor,
         fontFamily: 'Poppins',
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kWhiteColor,
+          foregroundColor: kDarkTextColor,
+          elevation: 0,
+        ),
       ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: kPrimaryColor,
+        scaffoldBackgroundColor: kDarkBackgroundColor,
+        cardColor: const Color(0xFF1E1E2C), // Slightly lighter than bg
+        fontFamily: 'Poppins',
+        appBarTheme: const AppBarTheme(
+          backgroundColor: kDarkBackgroundColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+      ),
+      themeMode: ThemeMode.system,
       home: const MainNavigationScreen(),
     );
   }
@@ -467,7 +491,7 @@ class AppointmentController extends GetxController {
     Get.snackbar(
       'Info',
       'Reschedule feature coming soon',
-      backgroundColor: Colors.blue,
+      backgroundColor: kPrimaryColor,
       colorText: Colors.white,
     );
   }
@@ -495,11 +519,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navBarColor = isDark ? Theme.of(context).cardColor : Colors.white;
+    final unselectedColor = isDark ? Colors.white54 : Colors.grey;
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: navBarColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -509,9 +538,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         ),
         child: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          selectedItemColor: const Color(0xFF546EDB),
-          unselectedItemColor: Colors.grey,
+          backgroundColor: navBarColor,
+          selectedItemColor: kPrimaryColor,
+          unselectedItemColor: unselectedColor,
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
           items: const [
@@ -544,22 +573,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 class FacultyDirectoryScreen extends StatelessWidget {
   const FacultyDirectoryScreen({Key? key}) : super(key: key);
 
-  static const Color primaryBg = Color(0xFF2D2658);
-  static const Color accentColor = Color(0xFF546EDB);
-
   @override
   Widget build(BuildContext context) {
     final FacultyController controller = Get.put(FacultyController());
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Scaffold(
-      backgroundColor: primaryBg,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(context, controller),
-            _buildSearchBar(controller),
-            _buildDepartmentFilter(controller),
-            Expanded(child: _buildFacultyList(controller)),
+            _buildSearchBar(context, controller),
+            _buildDepartmentFilter(context, controller),
+            Expanded(child: _buildFacultyList(context, controller)),
           ],
         ),
       ),
@@ -567,6 +594,10 @@ class FacultyDirectoryScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context, FacultyController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final subTextColor = isDark ? Colors.white70 : Colors.grey[700];
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -581,17 +612,17 @@ class FacultyDirectoryScreen extends StatelessWidget {
                   return FirebaseFirestore.instance.collection('users').doc(uid).get();
                 }(),
                 builder: (context, snap) {
-                  String name = 'Alex';
+                  String name = 'Student';
                   if (snap.connectionState == ConnectionState.done && snap.hasData && snap.data?.data() != null) {
                     final data = snap.data!.data() as Map<String, dynamic>;
-                    name = data['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'Alex';
+                    name = data['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'Student';
                   } else if (FirebaseAuth.instance.currentUser?.displayName != null) {
                     name = FirebaseAuth.instance.currentUser!.displayName!;
                   }
                   return Text(
                     'Hi, $name!',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
@@ -599,10 +630,10 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Find a Mentor',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: subTextColor,
                   fontSize: 16,
                 ),
               ),
@@ -611,11 +642,12 @@ class FacultyDirectoryScreen extends StatelessWidget {
           const Spacer(),
           CircleAvatar(
             radius: 24,
+            backgroundColor: kPrimaryColor.withOpacity(0.2),
             backgroundImage: FirebaseAuth.instance.currentUser?.photoURL != null
                 ? NetworkImage(FirebaseAuth.instance.currentUser!.photoURL!)
                 : null,
             child: FirebaseAuth.instance.currentUser?.photoURL == null
-                ? const Icon(Icons.person)
+                ? const Icon(Icons.person, color: kPrimaryColor)
                 : null,
           ),
         ],
@@ -623,29 +655,35 @@ class FacultyDirectoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSearchBar(FacultyController controller) {
+  Widget _buildSearchBar(BuildContext context, FacultyController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Theme.of(context).cardColor : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final hintColor = isDark ? Colors.white54 : Colors.grey[400];
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(30),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
           ],
         ),
         child: TextField(
+          style: TextStyle(color: textColor),
           onChanged: (value) => controller.searchQuery.value = value,
           decoration: InputDecoration(
             hintText: 'Search Professor, Dept, or Skill...',
-            hintStyle: TextStyle(color: Colors.grey[400]),
-            prefixIcon: const Icon(Icons.search, color: Colors.grey),
+            hintStyle: TextStyle(color: hintColor),
+            prefixIcon: Icon(Icons.search, color: isDark ? Colors.white54 : Colors.grey),
             suffixIcon: IconButton(
-              icon: const Icon(Icons.tune, color: accentColor),
+              icon: const Icon(Icons.tune, color: kPrimaryColor),
               onPressed: () {
                 // Additional filters
               },
@@ -661,7 +699,11 @@ class FacultyDirectoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDepartmentFilter(FacultyController controller) {
+  Widget _buildDepartmentFilter(BuildContext context, FacultyController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unselectedBg = isDark ? Theme.of(context).cardColor : Colors.white;
+    final unselectedText = isDark ? Colors.white70 : Colors.black87;
+
     return Container(
       height: 50,
       margin: const EdgeInsets.symmetric(vertical: 16),
@@ -680,14 +722,14 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(right: 12),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? accentColor : Colors.white,
+                  color: isSelected ? kPrimaryColor : unselectedBg,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Center(
                   child: Text(
                     dept,
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
+                      color: isSelected ? Colors.white : unselectedText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -700,11 +742,11 @@ class FacultyDirectoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFacultyList(FacultyController controller) {
+  Widget _buildFacultyList(BuildContext context, FacultyController controller) {
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(
-          child: CircularProgressIndicator(color: accentColor),
+          child: CircularProgressIndicator(color: kPrimaryColor),
         );
       }
 
@@ -716,13 +758,13 @@ class FacultyDirectoryScreen extends StatelessWidget {
               Icon(
                 Icons.search_off,
                 size: 80,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.grey.withOpacity(0.5),
               ),
               const SizedBox(height: 16),
               Text(
                 'No faculty found',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.grey.withOpacity(0.7),
                   fontSize: 18,
                 ),
               ),
@@ -743,13 +785,18 @@ class FacultyDirectoryScreen extends StatelessWidget {
   }
 
   Widget _buildFacultyCard(BuildContext context, FacultyUser faculty) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Theme.of(context).cardColor : Colors.white;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final subTextColor = isDark ? Colors.white70 : Colors.grey[600];
+
     return GestureDetector(
       onTap: () => _showBookingBottomSheet(context, faculty),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -783,7 +830,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                           ? const Color(0xFF00C853)
                           : Colors.grey,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: cardColor, width: 2),
                     ),
                   ),
                 ),
@@ -796,10 +843,10 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 children: [
                   Text(
                     faculty.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -807,7 +854,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                     faculty.department,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: subTextColor,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -843,7 +890,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () => _showBookingBottomSheet(context, faculty),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
+                    backgroundColor: kPrimaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -868,7 +915,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                     'View Profile',
                     style: TextStyle(
                       fontSize: 11,
-                      color: accentColor,
+                      color: kPrimaryColor,
                     ),
                   ),
                 ),
@@ -881,9 +928,15 @@ class FacultyDirectoryScreen extends StatelessWidget {
   }
 
   void _showProfileDialog(BuildContext context, FacultyUser faculty) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? Theme.of(context).cardColor : Colors.white;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final containerBg = isDark ? Colors.white10 : Colors.grey[100];
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
+        backgroundColor: dialogBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Container(
           padding: const EdgeInsets.all(24),
@@ -902,10 +955,10 @@ class FacultyDirectoryScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 faculty.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 8),
@@ -913,7 +966,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 faculty.title,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.white70 : Colors.grey[600],
                 ),
               ),
               const SizedBox(height: 4),
@@ -921,30 +974,32 @@ class FacultyDirectoryScreen extends StatelessWidget {
                 faculty.department,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.white70 : Colors.grey[600],
                 ),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: containerBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Office Hours',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: textColor,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       faculty.officeHours,
-                      style: TextStyle(color: Colors.grey[700]),
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey[700]
+                      ),
                     ),
                   ],
                 ),
@@ -956,7 +1011,7 @@ class FacultyDirectoryScreen extends StatelessWidget {
                   _showBookingBottomSheet(context, faculty);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: accentColor,
+                  backgroundColor: kPrimaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -1001,21 +1056,23 @@ class BookingBottomSheet extends StatelessWidget {
 
   const BookingBottomSheet({Key? key, required this.faculty}) : super(key: key);
 
-  static const Color accentColor = Color(0xFF546EDB);
-
   @override
   Widget build(BuildContext context) {
     final BookingController controller = Get.find<BookingController>();
-
+    
+    // Dynamic Theme
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? Theme.of(context).cardColor : Colors.white;
+    
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.5,
       maxChildSize: 0.95,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: Column(
             children: [
@@ -1033,15 +1090,15 @@ class BookingBottomSheet extends StatelessWidget {
                   controller: scrollController,
                   padding: const EdgeInsets.all(24),
                   children: [
-                    _buildHeader(),
+                    _buildHeader(context),
                     const SizedBox(height: 24),
-                    _buildOfficeHours(),
+                    _buildOfficeHours(context),
                     const SizedBox(height: 20),
                     _buildDateSelector(context, controller),
                     const SizedBox(height: 20),
-                    _buildTimeSlotSelector(controller),
+                    _buildTimeSlotSelector(context, controller),
                     const SizedBox(height: 20),
-                    _buildReasonInput(controller),
+                    _buildReasonInput(context, controller),
                     const SizedBox(height: 24),
                     _buildBookButton(context, controller),
                   ],
@@ -1054,7 +1111,10 @@ class BookingBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+
     return Row(
       children: [
         CircleAvatar(
@@ -1073,16 +1133,16 @@ class BookingBottomSheet extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Text(
+                  Text(
                     'Book with',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey,
+                      color: isDark ? Colors.white60 : Colors.grey,
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.share, size: 18),
+                    icon: Icon(Icons.share, size: 18, color: isDark ? Colors.white70 : Colors.grey),
                     onPressed: () {},
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -1091,10 +1151,10 @@ class BookingBottomSheet extends StatelessWidget {
               ),
               Text(
                 faculty.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: textColor,
                 ),
               ),
             ],
@@ -1104,22 +1164,26 @@ class BookingBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildOfficeHours() {
+  Widget _buildOfficeHours(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final containerBg = isDark ? Colors.white10 : Colors.grey[100];
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: containerBg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Office Hours',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: textColor,
             ),
           ),
           const SizedBox(height: 8),
@@ -1127,7 +1191,7 @@ class BookingBottomSheet extends StatelessWidget {
             faculty.officeHours,
             style: TextStyle(
               fontSize: 13,
-              color: Colors.grey[700],
+              color: isDark ? Colors.white70 : Colors.grey[700],
             ),
           ),
         ],
@@ -1136,20 +1200,22 @@ class BookingBottomSheet extends StatelessWidget {
   }
 
   Widget _buildDateSelector(BuildContext context, BookingController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Select Date',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 12),
         Obx(() {
-          // Embedded calendar picker
           final currentSelected = controller.selectedDate.value;
           DateTime initialDate;
           try {
@@ -1169,10 +1235,12 @@ class BookingBottomSheet extends StatelessWidget {
                   child: Theme(
                     data: Theme.of(context).copyWith(
                       colorScheme: ColorScheme.light(
-                        primary: accentColor,
+                        primary: kPrimaryColor,
                         onPrimary: Colors.white,
+                        surface: isDark ? Colors.grey[800]! : Colors.white,
+                        onSurface: isDark ? Colors.white : Colors.black,
                       ),
-                      primaryColor: accentColor,
+                      primaryColor: kPrimaryColor,
                     ),
                     child: CalendarDatePicker(
                       initialDate: initialDate,
@@ -1190,7 +1258,7 @@ class BookingBottomSheet extends StatelessWidget {
                     currentSelected.isNotEmpty
                         ? DateFormat('EEE, MMM d, yyyy').format(DateTime.parse(currentSelected))
                         : 'No date selected',
-                    style: TextStyle(color: Colors.grey[700]),
+                    style: TextStyle(color: isDark ? Colors.white70 : Colors.grey[700]),
                   ),
                 ),
               ],
@@ -1201,16 +1269,21 @@ class BookingBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildTimeSlotSelector(BookingController controller) {
+  Widget _buildTimeSlotSelector(BuildContext context, BookingController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final availableSlotBg = isDark ? Colors.white10 : Colors.white;
+    final unavailableSlotBg = isDark ? Colors.white.withOpacity(0.05) : Colors.grey[200];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Select a Slot',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -1221,7 +1294,6 @@ class BookingBottomSheet extends StatelessWidget {
             runSpacing: 12,
             children: slots.map((slot) {
               final isSelected = controller.selectedTimeSlot.value == slot;
-              // Parse slot to check if it's within office hours (simplified)
               final hour = int.parse(slot.split(':')[0]);
               final isAvailable = hour >= 10 && hour <= 16;
 
@@ -1236,17 +1308,17 @@ class BookingBottomSheet extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: !isAvailable
-                        ? Colors.grey[200]
+                        ? unavailableSlotBg
                         : isSelected
-                            ? accentColor
-                            : Colors.white,
+                            ? kPrimaryColor
+                            : availableSlotBg,
                     borderRadius: BorderRadius.circular(25),
                     border: Border.all(
                       color: !isAvailable
-                          ? Colors.grey[300]!
+                          ? (isDark ? Colors.white12 : Colors.grey[300]!)
                           : isSelected
-                              ? accentColor
-                              : Colors.grey[300]!,
+                              ? kPrimaryColor
+                              : (isDark ? Colors.white24 : Colors.grey[300]!),
                       width: 2,
                     ),
                   ),
@@ -1256,10 +1328,10 @@ class BookingBottomSheet extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: !isAvailable
-                          ? Colors.grey[400]
+                          ? (isDark ? Colors.white30 : Colors.grey[400])
                           : isSelected
                               ? Colors.white
-                              : Colors.black87,
+                              : (isDark ? Colors.white : Colors.black87),
                     ),
                   ),
                 ),
@@ -1271,16 +1343,21 @@ class BookingBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildReasonInput(BookingController controller) {
+  Widget _buildReasonInput(BuildContext context, BookingController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : kDarkTextColor;
+    final hintColor = isDark ? Colors.white38 : Colors.grey[400];
+    final borderColor = isDark ? Colors.white24 : Colors.grey[300]!;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Reason for Visit',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -1288,27 +1365,28 @@ class BookingBottomSheet extends StatelessWidget {
           controller: controller.reasonController,
           maxLines: 3,
           maxLength: 200,
+          style: TextStyle(color: textColor),
           decoration: InputDecoration(
             hintText: 'e.g., Thesis topic discussion',
-            hintStyle: TextStyle(color: Colors.grey[400]),
+            hintStyle: TextStyle(color: hintColor),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderSide: BorderSide(color: borderColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderSide: BorderSide(color: borderColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: accentColor, width: 2),
+              borderSide: const BorderSide(color: kPrimaryColor, width: 2),
             ),
             counterText: '',
           ),
         ),
         Text(
           '0/200',
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.grey[500]),
         ),
       ],
     );
@@ -1368,7 +1446,13 @@ class SuccessDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? Theme.of(context).cardColor : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final containerBg = isDark ? Colors.white10 : Colors.grey[100];
+
     return Dialog(
+      backgroundColor: dialogBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         padding: const EdgeInsets.all(32),
@@ -1389,12 +1473,12 @@ class SuccessDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Booking Confirmed!',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: textColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -1403,24 +1487,24 @@ class SuccessDialog extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: isDark ? Colors.white70 : Colors.grey[600],
               ),
             ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: containerBg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
                   Text(
                     'Dr. $facultyName',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: textColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1428,7 +1512,7 @@ class SuccessDialog extends StatelessWidget {
                     '$date at $time',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[700],
+                      color: isDark ? Colors.white70 : Colors.grey[700],
                     ),
                   ),
                 ],
@@ -1472,22 +1556,22 @@ class SuccessDialog extends StatelessWidget {
 class AppointmentsScreen extends StatelessWidget {
   const AppointmentsScreen({Key? key}) : super(key: key);
 
-  static const Color primaryBg = Color(0xFF2D2658);
-  static const Color accentColor = Color(0xFF546EDB);
-
   @override
   Widget build(BuildContext context) {
     final AppointmentController controller = Get.put(AppointmentController());
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
+    final appBarFg = Theme.of(context).appBarTheme.foregroundColor;
 
     return Scaffold(
-      backgroundColor: primaryBg,
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: primaryBg,
+        backgroundColor: appBarBg,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'My Appointments',
           style: TextStyle(
-            color: Colors.white,
+            color: appBarFg,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
@@ -1495,19 +1579,23 @@ class AppointmentsScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          _buildSegmentedControl(controller),
-          Expanded(child: _buildAppointmentsList(controller)),
+          _buildSegmentedControl(context, controller),
+          Expanded(child: _buildAppointmentsList(context, controller)),
         ],
       ),
     );
   }
 
-  Widget _buildSegmentedControl(AppointmentController controller) {
+  Widget _buildSegmentedControl(BuildContext context, AppointmentController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final containerBg = isDark ? Theme.of(context).cardColor : Colors.white;
+    final unselectedText = isDark ? Colors.white60 : Colors.black54;
+
     return Obx(() => Container(
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           height: 50,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: containerBg,
             borderRadius: BorderRadius.circular(25),
           ),
           child: Row(
@@ -1518,7 +1606,7 @@ class AppointmentsScreen extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: controller.selectedTab.value == 'Upcoming'
-                          ? accentColor
+                          ? kPrimaryColor
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(25),
                     ),
@@ -1528,7 +1616,7 @@ class AppointmentsScreen extends StatelessWidget {
                       style: TextStyle(
                         color: controller.selectedTab.value == 'Upcoming'
                             ? Colors.white
-                            : Colors.black54,
+                            : unselectedText,
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),
@@ -1542,7 +1630,7 @@ class AppointmentsScreen extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: controller.selectedTab.value == 'History'
-                          ? accentColor
+                          ? kPrimaryColor
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(25),
                     ),
@@ -1552,7 +1640,7 @@ class AppointmentsScreen extends StatelessWidget {
                       style: TextStyle(
                         color: controller.selectedTab.value == 'History'
                             ? Colors.white
-                            : Colors.black54,
+                            : unselectedText,
                         fontWeight: FontWeight.w600,
                         fontSize: 16,
                       ),
@@ -1565,11 +1653,11 @@ class AppointmentsScreen extends StatelessWidget {
         ));
   }
 
-  Widget _buildAppointmentsList(AppointmentController controller) {
+  Widget _buildAppointmentsList(BuildContext context, AppointmentController controller) {
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(
-          child: CircularProgressIndicator(color: accentColor),
+          child: CircularProgressIndicator(color: kPrimaryColor),
         );
       }
 
@@ -1585,13 +1673,13 @@ class AppointmentsScreen extends StatelessWidget {
               Icon(
                 Icons.calendar_today_outlined,
                 size: 80,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.grey.withOpacity(0.3),
               ),
               const SizedBox(height: 16),
               Text(
                 'No more upcoming appointments.',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.grey.withOpacity(0.7),
                   fontSize: 16,
                 ),
               ),
@@ -1599,7 +1687,7 @@ class AppointmentsScreen extends StatelessWidget {
               const Icon(
                 Icons.thumb_up_outlined,
                 size: 40,
-                color: Colors.white54,
+                color: Colors.grey,
               ),
             ],
           ),
@@ -1611,16 +1699,22 @@ class AppointmentsScreen extends StatelessWidget {
         itemCount: appointments.length,
         itemBuilder: (context, index) {
           final appointment = appointments[index];
-          return _buildAppointmentCard(controller, appointment);
+          return _buildAppointmentCard(context, controller, appointment);
         },
       );
     });
   }
 
   Widget _buildAppointmentCard(
+    BuildContext context,
     AppointmentController controller,
     AppointmentModel appointment,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? Theme.of(context).cardColor : Colors.white;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subTextColor = isDark ? Colors.white70 : Colors.grey[600];
+
     Color statusColor;
     String statusText;
 
@@ -1646,7 +1740,7 @@ class AppointmentsScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -1677,17 +1771,17 @@ class AppointmentsScreen extends StatelessWidget {
                   children: [
                     Text(
                       appointment.facultyName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: textColor,
                       ),
                     ),
                     Text(
                       appointment.facultyDept,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[600],
+                        color: subTextColor,
                       ),
                     ),
                   ],
@@ -1716,23 +1810,23 @@ class AppointmentsScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+              Icon(Icons.calendar_today, size: 16, color: subTextColor),
               const SizedBox(width: 8),
               Text(
                 DateFormat('MMM dd, yyyy').format(appointment.requestDate),
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: isDark ? Colors.white70 : Colors.grey[700],
                 ),
               ),
               const SizedBox(width: 16),
-              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              Icon(Icons.access_time, size: 16, color: subTextColor),
               const SizedBox(width: 8),
               Text(
                 appointment.requestTime,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[700],
+                  color: isDark ? Colors.white70 : Colors.grey[700],
                 ),
               ),
             ],
@@ -1743,7 +1837,7 @@ class AppointmentsScreen extends StatelessWidget {
               'Reason: ${appointment.reason}',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: subTextColor,
                 fontStyle: FontStyle.italic,
               ),
               maxLines: 2,
@@ -1760,7 +1854,7 @@ class AppointmentsScreen extends StatelessWidget {
                     onPressed: () =>
                         controller.rescheduleAppointment(appointment.id),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: accentColor),
+                      side: BorderSide(color: kPrimaryColor),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -1768,7 +1862,7 @@ class AppointmentsScreen extends StatelessWidget {
                     child: const Text(
                       'Reschedule',
                       style: TextStyle(
-                        color: accentColor,
+                        color: kPrimaryColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1813,15 +1907,22 @@ class PlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
+    final appBarFg = Theme.of(context).appBarTheme.foregroundColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : Colors.grey;
+
     return Scaffold(
-      backgroundColor: const Color(0xFF2D2658),
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2D2658),
+        backgroundColor: appBarBg,
         elevation: 0,
         title: Text(
           title,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: appBarFg,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
@@ -1834,13 +1935,13 @@ class PlaceholderScreen extends StatelessWidget {
             Icon(
               Icons.construction,
               size: 80,
-              color: Colors.white.withOpacity(0.3),
+              color: textColor.withOpacity(0.3),
             ),
             const SizedBox(height: 16),
             Text(
               '$title coming soon',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: textColor,
                 fontSize: 18,
               ),
             ),

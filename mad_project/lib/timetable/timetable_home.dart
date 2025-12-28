@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:get/get.dart';
+import 'package:reclaimify/theme_colors.dart'; // Ensure this matches your pubspec.yaml name
 import '../homepage/admin_dashboard.dart';
 import '../shared.dart';
 import 'timetable_service.dart';
@@ -129,11 +128,20 @@ class _TimetableScreenState extends State<TimetableScreen> {
     }
   }
 
+  /// Helper to get a card surface color that is distinctly lighter than the background in Dark Mode.
+  Color _getCardSurfaceColor(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // In dark mode, use a lighter purple/blue shade (0xFF3F376F) so it pops against the dark bg (0xFF2D2557).
+    // In light mode, use white.
+    return isDark ? const Color(0xFF3F376F) : Colors.white;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: getAppBackgroundColor(context),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -142,9 +150,17 @@ class _TimetableScreenState extends State<TimetableScreen> {
         return _buildSuperAdminUniversitySelector();
       }
       return Scaffold(
-        appBar: AppBar(title: const Text('My Timetable')),
-        body: const Center(
-          child: Text("Error: No University Linked to your account"),
+        backgroundColor: getAppBackgroundColor(context),
+        appBar: AppBar(
+          title: const Text('My Timetable'),
+          backgroundColor: isSuperAdmin ? Colors.purple : AppColors.mainColor,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Text(
+            "Error: No University Linked to your account",
+            style: TextStyle(color: getAppTextColor(context)),
+          ),
         ),
       );
     }
@@ -157,11 +173,15 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   Widget _buildSuperAdminUniversitySelector() {
+    final cardColor = _getCardSurfaceColor(context);
+
     if (universities.isEmpty) {
       return Scaffold(
+        backgroundColor: getAppBackgroundColor(context),
         appBar: AppBar(
           title: const Text('My Timetable'),
           backgroundColor: Colors.purple,
+          foregroundColor: Colors.white,
         ),
         body: Center(
           child: Column(
@@ -169,9 +189,13 @@ class _TimetableScreenState extends State<TimetableScreen> {
             children: [
               const Icon(Icons.school, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'No universities found.',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: getAppTextColor(context),
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -204,18 +228,24 @@ class _TimetableScreenState extends State<TimetableScreen> {
     }
 
     return Scaffold(
+      backgroundColor: getAppBackgroundColor(context),
       appBar: AppBar(
         title: const Text('Select University'),
         backgroundColor: Colors.purple,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'You are signed in as Super Admin.',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: getAppTextColor(context),
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -237,9 +267,13 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 return uniqueUnis
                     .map((u) => DropdownMenuItem<String>(
                         value: u['id'] as String,
-                        child: Text(u['name'] ?? u['id']!)))
+                        child: Text(
+                          u['name'] ?? u['id']!,
+                          style: TextStyle(color: getAppTextColor(context)),
+                        )))
                     .toList();
               })(),
+              dropdownColor: cardColor,
               onChanged: (val) async {
                 setState(() {
                   uniId = val;
@@ -250,11 +284,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   await _fetchDepartments(val);
                 }
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'University',
                 filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(),
+                fillColor: cardColor,
+                border: const OutlineInputBorder(),
+                labelStyle: TextStyle(color: getAppTextColor(context)),
               ),
             ),
             const SizedBox(height: 16),
@@ -278,10 +313,14 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   Widget _buildSuperAdminDepartmentSelector() {
+    final cardColor = _getCardSurfaceColor(context);
+
     return Scaffold(
+      backgroundColor: getAppBackgroundColor(context),
       appBar: AppBar(
         title: const Text('Select Department & Section'),
         backgroundColor: Colors.purple,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => setState(() {
@@ -300,7 +339,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
               'University: ${universities.firstWhere((u) => u['id'] == uniId, orElse: () => {
                     'name': uniId
                   })['name']}',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: getAppTextColor(context),
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -324,9 +367,13 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 return uniqueDepts
                     .map((d) => DropdownMenuItem<String>(
                         value: d['id'] as String,
-                        child: Text(d['name'] ?? d['id']!)))
+                        child: Text(
+                          d['name'] ?? d['id']!,
+                          style: TextStyle(color: getAppTextColor(context)),
+                        )))
                     .toList();
               })(),
+              dropdownColor: cardColor,
               onChanged: (val) async {
                 setState(() {
                   deptId = val;
@@ -336,11 +383,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   await _fetchSections(uniId!, val);
                 }
               },
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Department',
                 filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(),
+                fillColor: cardColor,
+                border: const OutlineInputBorder(),
+                labelStyle: TextStyle(color: getAppTextColor(context)),
               ),
             ),
             const SizedBox(height: 16),
@@ -361,31 +409,48 @@ class _TimetableScreenState extends State<TimetableScreen> {
                   return uniqueSecs
                       .map((s) => DropdownMenuItem<String>(
                           value: s['id'] as String,
-                          child: Text(s['name'] ?? s['id']!)))
+                          child: Text(
+                            s['name'] ?? s['id']!,
+                            style: TextStyle(color: getAppTextColor(context)),
+                          )))
                       .toList();
                 })(),
+                dropdownColor: cardColor,
                 onChanged: (val) => setState(() => sectionId = val),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Section',
                   filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(),
+                  fillColor: cardColor,
+                  border: const OutlineInputBorder(),
+                  labelStyle: TextStyle(color: getAppTextColor(context)),
                 ),
               ),
             const SizedBox(height: 16),
             if (deptId != null)
               DropdownButtonFormField<String>(
                 value: shift ?? 'morning',
-                items: const [
-                  DropdownMenuItem(value: 'morning', child: Text('Morning')),
-                  DropdownMenuItem(value: 'evening', child: Text('Evening')),
+                items: [
+                  DropdownMenuItem(
+                      value: 'morning',
+                      child: Text(
+                        'Morning',
+                        style: TextStyle(color: getAppTextColor(context)),
+                      )),
+                  DropdownMenuItem(
+                      value: 'evening',
+                      child: Text(
+                        'Evening',
+                        style: TextStyle(color: getAppTextColor(context)),
+                      )),
                 ],
+                dropdownColor: cardColor,
                 onChanged: (val) => setState(() => shift = val),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Shift',
                   filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(),
+                  fillColor: cardColor,
+                  border: const OutlineInputBorder(),
+                  labelStyle: TextStyle(color: getAppTextColor(context)),
                 ),
               ),
             const SizedBox(height: 24),
@@ -410,7 +475,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
 
   Widget _buildTimetableView() {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: getAppBackgroundColor(context),
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,6 +488,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
           ],
         ),
         backgroundColor: isSuperAdmin ? Colors.purple : AppColors.mainColor,
+        foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
@@ -454,9 +520,12 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   Widget _buildDaySelector() {
+    // Use the lighter card color for the day selector background too
+    final cardColor = _getCardSurfaceColor(context);
+    
     return Container(
       height: 60,
-      color: Colors.white,
+      color: cardColor, 
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: days.length,
@@ -484,7 +553,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                 style: TextStyle(
                   color: isSelected
                       ? (isSuperAdmin ? Colors.purple : AppColors.mainColor)
-                      : Colors.grey,
+                      : getAppTextColor(context).withOpacity(0.6),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -551,11 +620,14 @@ class _TimetableScreenState extends State<TimetableScreen> {
   }
 
   Widget _buildClassCard(Map<String, dynamic> data) {
+    // Specifically use lighter surface color so cards pop against dark background
+    final cardColor = _getCardSurfaceColor(context);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border(
           left: BorderSide(
@@ -577,9 +649,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
             children: [
               Text(
                 _formatTime12(data['start'] ?? ''),
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
+                  color: getAppTextColor(context),
                 ),
               ),
               Text(
@@ -598,9 +671,10 @@ class _TimetableScreenState extends State<TimetableScreen> {
               children: [
                 Text(
                   data['subject'],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
+                    color: getAppTextColor(context),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -632,8 +706,11 @@ class _TimetableScreenState extends State<TimetableScreen> {
     );
   }
 
-  // LANDSCAPE GRID: Days on LEFT, Times on TOP (like your screenshot)
+  // LANDSCAPE GRID: Days on LEFT, Times on TOP
   Widget _buildLandscapeGridView() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final gridBorderColor = isDark ? Colors.grey[800]! : Colors.grey[300]!;
+
     return StreamBuilder<QuerySnapshot>(
       stream: _service.getAdminTimetableStream(
         uniId: uniId!,
@@ -774,7 +851,7 @@ class _TimetableScreenState extends State<TimetableScreen> {
                                 child: Container(
                                   decoration: BoxDecoration(
                                     border: Border.all(
-                                      color: Colors.grey[300]!,
+                                      color: gridBorderColor,
                                       width: 0.5,
                                     ),
                                   ),

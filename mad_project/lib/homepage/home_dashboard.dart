@@ -8,6 +8,9 @@ import '../poster/marketplace_poster_slideshow.dart';
 import '../announcements/student_announcement_view.dart';
 import '../notifications.dart';
 
+// --- IMPORT GLOBAL THEME ---
+import '../theme_colors.dart';
+
 /// Modern Home/Dashboard Module - Redesigned for Eduverse
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -144,8 +147,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Theme Variables
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = getAppBackgroundColor(context);
+    final textColor = getAppTextColor(context);
+    final appBarBg = isDark ? kDarkBackgroundColor : Colors.white;
+    final appBarFg = isDark ? Colors.white : AppColors.darkGrey;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: bgColor,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -155,7 +165,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
               floating: true,
               pinned: true,
               elevation: 0,
-              backgroundColor: Colors.white,
+              backgroundColor: appBarBg,
               title: Row(
                 children: [
                   Container(
@@ -170,10 +180,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         const Icon(Icons.school, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
                     'Eduverse',
                     style: TextStyle(
-                      color: AppColors.darkGrey,
+                      color: appBarFg,
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
                     ),
@@ -192,14 +202,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 IconButton(
                   icon: Stack(
                     children: [
-                      const Icon(Icons.notifications, size: 24),
+                      Icon(Icons.notifications, size: 24, color: appBarFg),
                       if (_unreadCount > 0)
                         Positioned(
                           right: 0,
                           top: 0,
                           child: Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               color: Colors.red,
                               shape: BoxShape.circle,
                             ),
@@ -219,7 +229,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.person),
+                  icon: Icon(Icons.person, color: appBarFg),
                   onPressed: () => Get.toNamed('/profile'),
                 ),
                   
@@ -258,12 +268,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
+                        Text(
                           'Your Modules',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.darkGrey,
+                            color: textColor,
                           ),
                         ),
                       ],
@@ -519,6 +529,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Widget _buildModuleCard(ModuleItem module) {
+    // Theme Colors for Card
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // ✅ FIX: Transparent Light Card in Dark Mode (like your other screens)
+    final cardColor = isDark ? Colors.white.withOpacity(0.1) : Colors.white;
+    final titleColor = isDark ? Colors.white : AppColors.darkGrey;
+    final descColor = isDark ? Colors.white70 : AppColors.smallText;
+
     return GestureDetector(
       onTap: () {
         try {
@@ -548,8 +566,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
             Get.snackbar(
               'Coming Soon',
               '${module.title} is under development',
-              backgroundColor: Colors.white,
-              colorText: AppColors.darkGrey,
+              backgroundColor: isDark ? kDarkBackgroundColor : Colors.white,
+              colorText: isDark ? Colors.white : AppColors.darkGrey,
               borderRadius: 12,
               margin: const EdgeInsets.all(16),
               snackPosition: SnackPosition.BOTTOM,
@@ -565,11 +583,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: module.gradientColors[0].withOpacity(0.15),
+              color: isDark ? Colors.transparent : module.gradientColors[0].withOpacity(0.15),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -632,10 +650,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   // Title
                   Text(
                     module.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.darkGrey,
+                      color: titleColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -644,9 +662,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   // Description (larger and allow extra line)
                   Text(
                     module.description,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.smallText,
+                      color: descColor,
                     ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
