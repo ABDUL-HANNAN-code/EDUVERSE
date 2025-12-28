@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'announcement_model.dart';
+import '../notifications.dart';
 
 class AnnouncementService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -28,7 +29,7 @@ class AnnouncementService {
     required String uniId,
     required String authorName,
   }) async {
-    await _db.collection('announcements').add({
+    final docRef = await _db.collection('announcements').add({
       'title': title,
       'content': content,
       'imageBase64': imageBase64,
@@ -36,6 +37,20 @@ class AnnouncementService {
       'postedBy': authorName,
       'timestamp': FieldValue.serverTimestamp(),
     });
+
+    // Create an in-app notification and trigger push (Cloud Function will handle delivery)
+    try {
+      final notifier = NotificationService();
+      await notifier.notifyAnnouncement(
+        universityId: uniId,
+        title: title,
+        body: content,
+        imageBase64: imageBase64,
+        announcementId: docRef.id,
+      );
+    } catch (e) {
+      debugPrint('Failed to create announcement notification: $e');
+    }
   }
 
   /// Delete announcement

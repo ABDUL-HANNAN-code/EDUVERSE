@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../../auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -99,6 +100,21 @@ class _RecruiterRequestsAdminState extends State<RecruiterRequestsAdmin> {
           };
           await jobsRef.set(jobDoc);
 
+          // Notify students/admins about the new job posting
+          try {
+            final notifier = NotificationService();
+            if ((widget.adminUniId ?? '').isNotEmpty) {
+              await notifier.notifyJobPosting(
+                universityId: widget.adminUniId!,
+                companyName: jobDoc['company'] ?? jobDoc['recruiterEmail'] ?? 'Employer',
+                position: jobDoc['title'] ?? jobDoc['position'] ?? 'Job Posting',
+                jobId: jobsRef.id,
+              );
+            }
+          } catch (e) {
+            debugPrint('Failed to notify job posting: $e');
+          }
+
           // Update request with approved status and reference to created job
           await docRef.update({
             'status': status,
@@ -107,6 +123,20 @@ class _RecruiterRequestsAdminState extends State<RecruiterRequestsAdmin> {
             'jobId': jobsRef.id,
           });
 
+          // Notify the recruiter that their request was approved
+          try {
+            final recruiterId = data?['recruiterId'] as String?;
+            if (recruiterId != null && recruiterId.isNotEmpty) {
+              await NotificationService().notifyRequestApproved(
+                userId: recruiterId,
+                universityId: widget.adminUniId ?? '',
+                requestType: 'job posting',
+                requestId: jobsRef.id,
+              );
+            }
+          } catch (e) {
+            debugPrint('Failed to notify recruiter about approval: $e');
+          }
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content:
@@ -136,6 +166,24 @@ class _RecruiterRequestsAdminState extends State<RecruiterRequestsAdmin> {
         'approvedBy': widget.adminUniId ?? 'superadmin',
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      // If rejected, notify the recruiter
+      try {
+        if (status == 'rejected') {
+          final snap = await docRef.get();
+          final d = snap.data() as Map<String, dynamic>?;
+          final recruiterId = d?['recruiterId'] as String?;
+          if (recruiterId != null && recruiterId.isNotEmpty) {
+            await NotificationService().notifyRequestRejected(
+              userId: recruiterId,
+              universityId: widget.adminUniId ?? '',
+              requestType: 'job posting',
+              reason: 'Request rejected by admin',
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to notify recruiter about rejection: $e');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Request $status')));

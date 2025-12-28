@@ -1,0 +1,1825 @@
+// ============================================================================
+// COMPLETE EDUVERSE NOTIFICATION SYSTEM (V1 API COMPATIBLE)
+// ============================================================================
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle; // Required to read JSON
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:googleapis_auth/auth_io.dart'; // REQUIRED: Add googleapis_auth to pubspec
+import 'package:http/http.dart' as http; // REQUIRED: Add http to pubspec
+
+// ============================================================================
+// 0. TOP-LEVEL BACKGROUND HANDLER
+// ============================================================================
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  debugPrint("Handling a background message: ${message.messageId}");
+}
+
+// Theme Constants
+class AppTheme {
+  static const Color kPrimaryColor = Color(0xFF6C63FF);
+  static const Color kSecondaryColor = Color(0xFF4A90E2);
+  static const Color kBackgroundColor = Color(0xFFF5F7FA);
+  static const Color kDarkTextColor = Color(0xFF2D3142);
+  static const Color kWhiteColor = Color(0xFFFFFFFF);
+}
+
+// ============================================================================
+// 1. NOTIFICATION MODELS
+// ============================================================================
+
+enum NotificationType {
+  announcement,
+  timetable,
+  lostAndFound,
+  jobPosting,
+  requestApproved,
+  requestRejected,
+  complaintInProgress,
+  complaintResolved,
+  marketplace,
+  custom,
+}
+
+enum NotificationPriority { low, normal, high, urgent }
+
+class AppNotification {
+  final String id;
+  final String title;
+  final String body;
+  final NotificationType type;
+  final NotificationPriority priority;
+  final String universityId;
+  final String? userId;
+  final String? imageUrl;
+  final String? imageBase64;
+  final Map<String, dynamic>? data;
+  final DateTime createdAt;
+  final bool isRead;
+  final bool isPushSent;
+
+  AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.type,
+    this.priority = NotificationPriority.normal,
+    required this.universityId,
+    this.userId,
+    this.imageUrl,
+    this.imageBase64,
+    this.data,
+    required this.createdAt,
+    this.isRead = false,
+    this.isPushSent = false,
+  });
+
+  bool get isNew => DateTime.now().difference(createdAt).inHours <= 24;
+
+  String get timeAgo {
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${createdAt.day}/${createdAt.month}/${createdAt.year}';
+  }
+
+  IconData get icon {
+    const icons = {
+      NotificationType.announcement: Icons.campaign,
+      NotificationType.timetable: Icons.calendar_today,
+      NotificationType.lostAndFound: Icons.search,
+      NotificationType.jobPosting: Icons.work,
+      NotificationType.requestApproved: Icons.check_circle,
+      NotificationType.requestRejected: Icons.cancel,
+      NotificationType.complaintInProgress: Icons.pending,
+      NotificationType.complaintResolved: Icons.done_all,
+      NotificationType.marketplace: Icons.shopping_bag,
+      NotificationType.custom: Icons.notifications,
+    };
+    return icons[type] ?? Icons.notifications;
+  }
+
+  Color get color {
+    const colors = {
+      NotificationType.announcement: Color(0xFF6C63FF),
+      NotificationType.timetable: Color(0xFF4A90E2),
+      NotificationType.lostAndFound: Color(0xFFFFA726),
+      NotificationType.jobPosting: Color(0xFF66BB6A),
+      NotificationType.requestApproved: Color(0xFF26A69A),
+      NotificationType.requestRejected: Color(0xFFEF5350),
+      NotificationType.complaintInProgress: Color(0xFFFF9800),
+      NotificationType.complaintResolved: Color(0xFF4CAF50),
+      NotificationType.marketplace: Color(0xFF9C27B0),
+    };
+    return colors[type] ?? const Color(0xFF6C63FF);
+  }
+
+  AppNotification copyWith({bool? isRead, bool? isPushSent}) {
+    return AppNotification(
+      id: id,
+      title: title,
+      body: body,
+      type: type,
+      priority: priority,
+      universityId: universityId,
+      userId: userId,
+      imageUrl: imageUrl,
+      imageBase64: imageBase64,
+      data: data,
+      createdAt: createdAt,
+      isRead: isRead ?? this.isRead,
+      isPushSent: isPushSent ?? this.isPushSent,
+    );
+  }
+}
+
+// ============================================================================
+// 2. NOTIFICATION SERVICE
+// ============================================================================
+
+class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+
+  // ⚠️ REPLACE WITH YOUR FIREBASE PROJECT ID (Found in Project Settings > General)
+  static const String _projectId = 'my-project-859f5'; 
+
+  // --- INITIALIZATION ---
+  Future<void> init() async {
+    // 1. Background Handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // 2. Request Permissions
+    NotificationSettings settings = await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('User granted permission: ${settings.authorizationStatus}');
+
+    // 3. Setup Local Notifications
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/launcher_icon');
+    
+    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false, 
+      requestBadgePermission: false, 
+      requestSoundPermission: false,
+    );
+
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _localNotifications.initialize(initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        debugPrint('Local Notification Tapped: ${response.payload}');
+      },
+    );
+
+    // 4. Foreground Listener
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null) {
+        showLocalNotification(
+          title: message.notification!.title ?? 'New Notification',
+          body: message.notification!.body ?? '',
+          payload: jsonEncode(message.data),
+        );
+      }
+    });
+  }
+
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'high_importance_channel', 
+      'High Importance Notifications', 
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
+
+    await _localNotifications.show(
+      DateTime.now().millisecond, 
+      title,
+      body,
+      details,
+      payload: payload,
+    );
+  }
+
+  Future<void> subscribeToUniversity(String universityId) async {
+    await _fcm.subscribeToTopic('university_$universityId');
+  }
+
+  // --- DB Operations ---
+
+  Future<List<AppNotification>> fetchNotifications({
+    required String userId,
+    required String universityId,
+    bool unreadOnly = false,
+  }) async {
+    Query query = _db
+        .collection('notifications')
+        .where('universityId', isEqualTo: universityId)
+        .orderBy('createdAt', descending: true);
+
+    if (unreadOnly) query = query.where('isRead', isEqualTo: false);
+
+    final snapshot = await query.get();
+    return snapshot.docs.map(_docToNotification).toList();
+  }
+
+  Future<void> markAsRead(String notificationId) async {
+    await _db.collection('notifications').doc(notificationId).update({'isRead': true});
+  }
+
+  Future<void> markAllAsRead(String userId, String universityId) async {
+    final snapshot = await _db
+        .collection('notifications')
+        .where('universityId', isEqualTo: universityId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    final batch = _db.batch();
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final targetUser = data['userId'] as String?;
+      if (targetUser == null || targetUser == userId) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+    }
+    await batch.commit();
+  }
+
+  Future<void> deleteNotification(String notificationId) async {
+    await _db.collection('notifications').doc(notificationId).delete();
+  }
+
+  Future<int> getUnreadCount(String userId, String universityId) async {
+    final snapshot = await _db
+        .collection('notifications')
+        .where('universityId', isEqualTo: universityId)
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    return snapshot.docs.where((d) {
+      final u = d.data()['userId'] as String?;
+      return u == null || u == userId;
+    }).length;
+  }
+
+  Stream<List<AppNotification>> streamNotifications({
+    required String userId,
+    required String universityId,
+    bool unreadOnly = false,
+    int limit = 50,
+  }) {
+    Query query = _db
+        .collection('notifications')
+        .where('universityId', isEqualTo: universityId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (unreadOnly) query = query.where('isRead', isEqualTo: false);
+
+    return query.snapshots().map((snapshot) => snapshot.docs.map(_docToNotification).toList());
+  }
+
+  // --- PERSIST TOKEN FOR TARGETED NOTIFICATIONS ---
+  Future<void> registerFcmToken({required String userId, required String token}) async {
+    if (userId.isEmpty || token.isEmpty) return;
+    await _db.collection('users').doc(userId).collection('fcmTokens').doc(token).set({
+      'createdAt': FieldValue.serverTimestamp(),
+      'platform': Platform.operatingSystem,
+    });
+  }
+
+  // ========== NOTIFICATION CREATION & V1 PUSH TRIGGER ==========
+
+  Future<void> notifyLostAndFound({
+    required String universityId,
+    required String itemName,
+    required bool isLost,
+    String? postId,
+  }) async {
+    await _createAndPushNotification(
+      title: isLost ? 'Item Lost Posted' : 'Item Found Posted',
+      body: 'Someone posted about: $itemName',
+      type: NotificationType.lostAndFound,
+      universityId: universityId,
+      data: {'post_id': postId, 'is_lost': isLost},
+    );
+  }
+  
+  // (You can replicate the pattern below for other module methods: notifyJobPosting, etc.)
+
+  Future<void> _createAndPushNotification({
+    required String title,
+    required String body,
+    required NotificationType type,
+    required String universityId,
+    String? userId,
+    String? imageUrl,
+    String? imageBase64,
+    NotificationPriority priority = NotificationPriority.normal,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // 1. SAVE TO DB
+      final docRef = await FirebaseFirestore.instance.collection('notifications').add({
+        'title': title,
+        'body': body,
+        'type': type.toString().split('.').last,
+        'priority': priority.toString().split('.').last,
+        'universityId': universityId,
+        'userId': userId,
+        'imageUrl': imageUrl,
+        'imageBase64': imageBase64,
+        'data': data ?? {},
+        'isRead': false,
+        'isPushSent': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 2. SEND HTTP V1 PUSH
+      if (userId != null) {
+        // Target Specific User
+        final tokensSnapshot = await _db.collection('users').doc(userId).collection('fcmTokens').get();
+        for (var doc in tokensSnapshot.docs) {
+          await _sendV1Push(
+            token: doc.id,
+            title: title,
+            body: body,
+            data: data
+          );
+        }
+      } else {
+        // Broadcast to Topic
+        await _sendV1Push(
+          topic: 'university_$universityId',
+          title: title,
+          body: body,
+          data: data
+        );
+      }
+
+      await docRef.update({'isPushSent': true});
+
+    } catch (e) {
+      debugPrint('Error creating notification: $e');
+    }
+  }
+
+  // --- V1 API PUSH SENDER (CLIENT SIDE MINTING) ---
+  Future<void> _sendV1Push({
+    String? token,
+    String? topic,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      // 1. Load Service Account from Assets
+      final String response = await rootBundle.loadString('assets/service_account.json');
+      final Map<String, dynamic> saMap = jsonDecode(response) as Map<String, dynamic>;
+      final serviceAccountCredentials = ServiceAccountCredentials.fromJson(saMap);
+
+      // 2. Get Authenticated Client
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+      final client = await clientViaServiceAccount(serviceAccountCredentials, scopes);
+
+      // 3. Construct Payload
+      final Map<String, dynamic> messagePayload = {
+        'message': {
+          if (token != null) 'token': token,
+          if (topic != null) 'topic': topic,
+          'notification': {
+            'title': title,
+            'body': body,
+          },
+          'data': data?.map((key, value) => MapEntry(key, value.toString())) ?? {},
+        }
+      };
+
+      // 4. Send Request
+      final url = Uri.parse('https://fcm.googleapis.com/v1/projects/$_projectId/messages:send');
+      
+      final httpResponse = await client.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(messagePayload),
+      );
+
+      if (httpResponse.statusCode == 200) {
+        debugPrint('V1 Notification Sent Successfully!');
+      } else {
+        debugPrint('Failed to send V1 Notification: ${httpResponse.body}');
+      }
+      
+      client.close();
+
+    } catch (e) {
+      debugPrint('Error sending V1 Push: $e');
+    }
+  }
+
+  // -------------------- Convenience wrappers --------------------
+  Future<void> notifyAnnouncement({
+    required String universityId,
+    required String title,
+    required String body,
+    String? imageUrl,
+    String? imageBase64,
+    String? announcementId,
+  }) async {
+    await _createAndPushNotification(
+      title: title,
+      body: body,
+      type: NotificationType.announcement,
+      universityId: universityId,
+      imageUrl: imageUrl,
+      imageBase64: imageBase64,
+      data: {'announcement_id': announcementId},
+      priority: NotificationPriority.high,
+    );
+  }
+
+  Future<void> notifyTimetableUpdate({
+    required String universityId,
+    String? className,
+    String? title,
+    String? body,
+    String? timetableId,
+    String? userId,
+  }) async {
+    final tTitle = title ?? (className != null ? 'Timetable update: $className' : 'Timetable update');
+    final tBody = body ?? (className != null ? '$className schedule changed' : 'A timetable entry was updated');
+    await _createAndPushNotification(
+      title: tTitle,
+      body: tBody,
+      type: NotificationType.timetable,
+      universityId: universityId,
+      userId: userId,
+      data: {'timetable_id': timetableId},
+    );
+  }
+
+  Future<void> notifyJobPosting({
+    required String universityId,
+    String? companyName,
+    String? position,
+    String? title,
+    String? body,
+    String? jobId,
+  }) async {
+    final tTitle = title ?? (position != null ? position : 'New Job Posting');
+    final tBody = body ?? (companyName != null ? '$companyName posted ${position ?? 'a job'}' : 'A new job was posted');
+    await _createAndPushNotification(
+      title: tTitle,
+      body: tBody,
+      type: NotificationType.jobPosting,
+      universityId: universityId,
+      data: {'job_id': jobId},
+    );
+  }
+
+  Future<void> notifyMarketplace({
+    required String universityId,
+    required String itemName,
+    required String price,
+    String? postId,
+    String? imageUrl,
+  }) async {
+    await _createAndPushNotification(
+      title: 'New Item Listed',
+      body: '$itemName listed for $price',
+      type: NotificationType.marketplace,
+      universityId: universityId,
+      imageUrl: imageUrl,
+      data: {'post_id': postId},
+    );
+  }
+
+  Future<void> notifyRequestApproved({
+    required String userId,
+    required String universityId,
+    required String requestType,
+    String? requestId,
+  }) async {
+    await _createAndPushNotification(
+      title: 'Request Approved',
+      body: 'Your $requestType request has been approved',
+      type: NotificationType.requestApproved,
+      universityId: universityId,
+      userId: userId,
+      priority: NotificationPriority.high,
+      data: {'request_id': requestId},
+    );
+  }
+
+  Future<void> notifyRequestRejected({
+    required String userId,
+    required String universityId,
+    required String requestType,
+    String? reason,
+    String? requestId,
+  }) async {
+    await _createAndPushNotification(
+      title: 'Request Declined',
+      body: reason ?? 'Your $requestType request was declined',
+      type: NotificationType.requestRejected,
+      universityId: universityId,
+      userId: userId,
+      priority: NotificationPriority.high,
+      data: {'request_id': requestId},
+    );
+  }
+
+  Future<void> notifyComplaintStatus({
+    required String userId,
+    required String universityId,
+    required bool isResolved,
+    required String complaintTitle,
+    String? complaintId,
+  }) async {
+    await _createAndPushNotification(
+      title: isResolved ? 'Complaint Resolved' : 'Complaint In Progress',
+      body: isResolved
+          ? 'Your complaint "$complaintTitle" has been resolved'
+          : 'Your complaint "$complaintTitle" is being processed',
+      type: isResolved ? NotificationType.complaintResolved : NotificationType.complaintInProgress,
+      universityId: universityId,
+      userId: userId,
+      priority: isResolved ? NotificationPriority.high : NotificationPriority.normal,
+      data: {'complaint_id': complaintId},
+    );
+  }
+
+  Future<void> sendCustomNotification({
+    required String title,
+    required String body,
+    required String universityId,
+    String? userId,
+    String? imageUrl,
+    String? imageBase64,
+    NotificationPriority priority = NotificationPriority.normal,
+    Map<String, dynamic>? data,
+  }) async {
+    await _createAndPushNotification(
+      title: title,
+      body: body,
+      type: NotificationType.custom,
+      universityId: universityId,
+      userId: userId,
+      imageUrl: imageUrl,
+      imageBase64: imageBase64,
+      priority: priority,
+      data: data,
+    );
+  }
+
+  // Simple user preferences storage for notification settings
+  Future<Map<String, dynamic>> loadUserPreferences(String userId) async {
+    try {
+      final doc = await _db.collection('users').doc(userId).collection('settings').doc('notifications').get();
+      if (!doc.exists) return {};
+      return Map<String, dynamic>.from(doc.data() ?? {});
+    } catch (e) {
+      return {};
+    }
+  }
+
+  Future<void> saveUserPreferences(String userId, Map<String, dynamic> prefs) async {
+    try {
+      await _db.collection('users').doc(userId).collection('settings').doc('notifications').set(prefs, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Failed to save user notification prefs: $e');
+    }
+  }
+
+  // ... (Keep your loadUserPreferences, saveUserPreferences, other helper methods here) ...
+  
+  AppNotification _docToNotification(QueryDocumentSnapshot doc) {
+    // (Keep your existing _docToNotification logic here)
+    final data = doc.data() as Map<String, dynamic>;
+    DateTime createdAt;
+    final ts = data['createdAt'];
+    if (ts is Timestamp) {
+      createdAt = ts.toDate();
+    } else {
+      createdAt = DateTime.now();
+    }
+    
+    // ... rest of mapping logic
+    return AppNotification(
+      id: doc.id,
+      title: data['title'] ?? '',
+      body: data['body'] ?? '',
+      type: NotificationType.custom, // Simplify for brevity in this snippet
+      priority: NotificationPriority.normal,
+      universityId: data['universityId'] ?? '',
+      createdAt: createdAt,
+    );
+  }
+  
+  // ... (Add back module specific methods like notifyComplaintStatus using _createAndPushNotification) ...
+}
+
+// ============================================================================
+// 3. NOTIFICATION PAGE UI (Keep your existing UI code)
+// ============================================================================
+// (Paste your NotificationPage and UI widgets here from the previous file)============================================================================
+
+class NotificationPage extends StatefulWidget {
+  final String userId;
+  final String universityId;
+
+  const NotificationPage({
+    super.key,
+    required this.userId,
+    required this.universityId,
+  });
+
+  @override
+  State<NotificationPage> createState() => _NotificationPageState();
+}
+
+class _NotificationPageState extends State<NotificationPage>
+    with SingleTickerProviderStateMixin {
+  final NotificationService _service = NotificationService();
+    late Stream<List<AppNotification>> _notificationsStream;
+  bool _showUnreadOnly = false;
+  late TabController _tabController;
+  int _unreadCount = 0;
+  int _totalCount = 0;
+  StreamSubscription<List<AppNotification>>? _subs;
+  // Resolved university id to use for queries (may be resolved from user doc)
+  String _resolvedUniversityId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // If universityId wasn't provided, resolve it from the user's profile first.
+    () async {
+      String uni = widget.universityId;
+      try {
+        if ((uni == null || uni.isEmpty) && widget.userId.isNotEmpty) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
+          if (userDoc.exists) {
+            final data = userDoc.data();
+            uni = (data != null && (data['uniId'] != null || data['universityId'] != null))
+                ? (data['uniId'] ?? data['universityId']).toString()
+                : '';
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to resolve universityId for notifications: $e');
+      }
+
+      _resolvedUniversityId = uni;
+
+      _notificationsStream = _service.streamNotifications(
+        userId: widget.userId,
+        universityId: _resolvedUniversityId,
+        unreadOnly: _showUnreadOnly,
+      );
+
+      _subs = _notificationsStream.listen((list) {
+      if (!mounted) return;
+      setState(() {
+        _totalCount = list.length;
+        _unreadCount = list.where((n) => !n.isRead).length;
+      });
+    });
+    }();
+  }
+
+  @override
+  void dispose() {
+    _subs?.cancel();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // no-op: realtime stream is used; pull-to-refresh will re-fetch once
+
+  Future<void> _markAllAsRead() async {
+    await _service.markAllAsRead(widget.userId, _resolvedUniversityId);
+   
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('All notifications marked as read'),
+          backgroundColor: AppTheme.kPrimaryColor,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.kBackgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppTheme.kWhiteColor,
+        title: Text(
+          'Notifications',
+          style: TextStyle(
+            color: AppTheme.kDarkTextColor,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          if (_unreadCount > 0)
+            IconButton(
+              icon: Icon(Icons.done_all, color: AppTheme.kPrimaryColor),
+              onPressed: _markAllAsRead,
+              tooltip: 'Mark all as read',
+            ),
+          IconButton(
+            icon: Icon(Icons.settings, color: AppTheme.kPrimaryColor),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotificationSettingsPage(
+                    userId: widget.userId,
+                  ),
+                ),
+              );
+            },
+            tooltip: 'Settings',
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.kPrimaryColor,
+          unselectedLabelColor: AppTheme.kDarkTextColor.withOpacity(0.5),
+          indicatorColor: AppTheme.kPrimaryColor,
+          onTap: (index) {
+            setState(() {
+              _showUnreadOnly = index == 1;
+              _notificationsStream = _service.streamNotifications(
+                userId: widget.userId,
+                universityId: _resolvedUniversityId,
+                unreadOnly: _showUnreadOnly,
+              );
+            });
+          },
+          tabs: [
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('All'),
+                    if (_unreadCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(left: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.kPrimaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                          '$_totalCount',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Unread'),
+                    if (_unreadCount > 0)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '$_unreadCount',
+                          style: const TextStyle(fontSize: 12, color: Colors.white),
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: StreamBuilder<List<AppNotification>>(
+        stream: _notificationsStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: AppTheme.kPrimaryColor));
+          }
+          if (snapshot.hasError) {
+            debugPrint('Notifications stream error: ${snapshot.error}');
+            return Center(child: Text('Error loading notifications: ${snapshot.error}'));
+          }
+          final notifications = snapshot.data ?? [];
+          final unreadCount = notifications.where((n) => !n.isRead).length;
+
+          if (notifications.isEmpty) return _buildEmptyState();
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              await _service.fetchNotifications(userId: widget.userId, universityId: widget.universityId, unreadOnly: _showUnreadOnly);
+            },
+            color: AppTheme.kPrimaryColor,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: notifications.length,
+              itemBuilder: (context, index) {
+                final n = notifications[index];
+                return _NotificationCard(
+                  notification: n,
+                  onTap: () => _handleNotificationTap(n),
+                  onDismiss: () => _deleteNotification(n),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _showUnreadOnly ? Icons.notifications_none : Icons.notifications_off,
+            size: 80,
+            color: AppTheme.kPrimaryColor.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _showUnreadOnly ? 'No unread notifications' : 'No notifications yet',
+            style: TextStyle(
+              fontSize: 18,
+              color: AppTheme.kDarkTextColor.withOpacity(0.6),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _showUnreadOnly
+                ? 'You\'re all caught up!'
+                : 'We\'ll notify you when something happens',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppTheme.kDarkTextColor.withOpacity(0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleNotificationTap(AppNotification notification) async {
+    if (!notification.isRead) {
+      await _service.markAsRead(notification.id);
+    }
+    // TODO: Navigate based on notification.type and notification.data
+    _showNotificationDetail(notification);
+  }
+
+  void _showNotificationDetail(AppNotification notification) {
+    showDialog(
+      context: context,
+      builder: (context) => _NotificationDetailDialog(notification: notification),
+    );
+  }
+
+  Future<void> _deleteNotification(AppNotification notification) async {
+    await _service.deleteNotification(notification.id);
+  }
+}
+
+// Notification Card
+class _NotificationCard extends StatelessWidget {
+  final AppNotification notification;
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  const _NotificationCard({
+    required this.notification,
+    required this.onTap,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: Key(notification.id),
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDismiss(),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: notification.isRead
+                ? AppTheme.kWhiteColor
+                : AppTheme.kPrimaryColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: notification.isRead
+                ? null
+                : Border.all(color: AppTheme.kPrimaryColor.withOpacity(0.2), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.kDarkTextColor.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Icon
+              Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: notification.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(notification.icon, color: notification.color, size: 24),
+              ),
+              
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notification.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: notification.isRead
+                                  ? FontWeight.w600
+                                  : FontWeight.bold,
+                              color: AppTheme.kDarkTextColor,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (notification.isNew && !notification.isRead)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'NEW',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.body,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.kDarkTextColor.withOpacity(0.7),
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      notification.timeAgo,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.kSecondaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Unread indicator
+              if (!notification.isRead)
+                Container(
+                  margin: const EdgeInsets.only(right: 16),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppTheme.kPrimaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Notification Detail Dialog
+class _NotificationDetailDialog extends StatelessWidget {
+  final AppNotification notification;
+
+  const _NotificationDetailDialog({required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    Uint8List? imageBytes;
+    if (notification.imageBase64 != null) {
+      try {
+        imageBytes = base64Decode(notification.imageBase64!);
+      } catch (e) {
+        print('Error decoding base64 image: $e');
+      }
+    }
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        decoration: BoxDecoration(
+          color: AppTheme.kWhiteColor,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: notification.color,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Row(
+                children: [
+                  Icon(notification.icon, color: Colors.white, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      notification.title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image
+                    if (notification.imageUrl != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          notification.imageUrl!,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    else if (imageBytes != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          imageBytes,
+                          width: double.infinity,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    
+                    if (notification.imageUrl != null || imageBytes != null)
+                      const SizedBox(height: 16),
+                    
+                    // Body
+                    Text(
+                      notification.body,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppTheme.kDarkTextColor,
+                        height: 1.6,
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Time
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: 16, color: AppTheme.kSecondaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          notification.timeAgo,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.kSecondaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// 4. NOTIFICATION SETTINGS PAGE
+// ============================================================================
+
+class NotificationSettingsPage extends StatefulWidget {
+  final String userId;
+
+  const NotificationSettingsPage({super.key, required this.userId});
+
+  @override
+  State<NotificationSettingsPage> createState() => _NotificationSettingsPageState();
+}
+
+class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
+  bool announcements = true;
+  bool timetable = true;
+  bool lostAndFound = true;
+  bool jobPostings = true;
+  bool requests = true;
+  bool complaints = true;
+  bool marketplace = true;
+  bool pushEnabled = true;
+  bool soundEnabled = true;
+  bool vibrationEnabled = true;
+  final NotificationService _service = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await _service.loadUserPreferences(widget.userId);
+    if (prefs == null) return;
+    setState(() {
+      announcements = prefs['announcements'] ?? announcements;
+      timetable = prefs['timetable'] ?? timetable;
+      lostAndFound = prefs['lostAndFound'] ?? lostAndFound;
+      jobPostings = prefs['jobPostings'] ?? jobPostings;
+      requests = prefs['requests'] ?? requests;
+      complaints = prefs['complaints'] ?? complaints;
+      marketplace = prefs['marketplace'] ?? marketplace;
+      pushEnabled = prefs['pushEnabled'] ?? pushEnabled;
+      soundEnabled = prefs['soundEnabled'] ?? soundEnabled;
+      vibrationEnabled = prefs['vibrationEnabled'] ?? vibrationEnabled;
+    });
+  }
+
+  Future<void> _save() async {
+    await _service.saveUserPreferences(widget.userId, {
+      'announcements': announcements,
+      'timetable': timetable,
+      'lostAndFound': lostAndFound,
+      'jobPostings': jobPostings,
+      'requests': requests,
+      'complaints': complaints,
+      'marketplace': marketplace,
+      'pushEnabled': pushEnabled,
+      'soundEnabled': soundEnabled,
+      'vibrationEnabled': vibrationEnabled,
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.kBackgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppTheme.kWhiteColor,
+        title: Text(
+          'Notification Settings',
+          style: TextStyle(
+            color: AppTheme.kDarkTextColor,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: AppTheme.kDarkTextColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildSection(
+            'Notification Types',
+            [
+              _buildSwitch('Announcements', announcements, (v) async { setState(() => announcements = v); await _save(); }),
+              _buildSwitch('Timetable Updates', timetable, (v) async { setState(() => timetable = v); await _save(); }),
+              _buildSwitch('Lost & Found', lostAndFound, (v) async { setState(() => lostAndFound = v); await _save(); }),
+              _buildSwitch('Job Postings', jobPostings, (v) async { setState(() => jobPostings = v); await _save(); }),
+              _buildSwitch('Request Status', requests, (v) async { setState(() => requests = v); await _save(); }),
+              _buildSwitch('Complaint Updates', complaints, (v) async { setState(() => complaints = v); await _save(); }),
+              _buildSwitch('Marketplace', marketplace, (v) async { setState(() => marketplace = v); await _save(); }),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildSection(
+            'Push Notifications',
+            [
+              _buildSwitch('Enable Push Notifications', pushEnabled, (v) async { setState(() => pushEnabled = v); await _save(); }),
+              _buildSwitch('Sound', soundEnabled, (v) async { setState(() => soundEnabled = v); await _save(); }),
+              _buildSwitch('Vibration', vibrationEnabled, (v) async { setState(() => vibrationEnabled = v); await _save(); }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSection(String title, List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.kWhiteColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.kDarkTextColor.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.kDarkTextColor,
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSwitch(String title, bool value, Function(bool) onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              color: AppTheme.kDarkTextColor,
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: AppTheme.kPrimaryColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// 5. ADMIN CUSTOM NOTIFICATION SENDER
+// ============================================================================
+
+class AdminNotificationSender extends StatefulWidget {
+  final String adminId;
+  final String universityId;
+
+  const AdminNotificationSender({
+    super.key,
+    required this.adminId,
+    required this.universityId,
+  });
+
+  @override
+  State<AdminNotificationSender> createState() => _AdminNotificationSenderState();
+}
+
+class _AdminNotificationSenderState extends State<AdminNotificationSender> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _bodyController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  String? _imageBase64;
+  NotificationPriority _priority = NotificationPriority.normal;
+  bool _isBroadcast = true;
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _bodyController.dispose();
+    _imageUrlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    // In production, use image_picker package
+    // For demo, we'll use a placeholder
+    setState(() {
+      _imageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Image selected (demo mode)'),
+          backgroundColor: AppTheme.kPrimaryColor,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendNotification() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final service = NotificationService();
+      
+      await service.sendCustomNotification(
+        title: _titleController.text.trim(),
+        body: _bodyController.text.trim(),
+        universityId: widget.universityId,
+        userId: _isBroadcast ? null : 'specific-user-id',
+        imageUrl: _imageUrlController.text.trim().isEmpty 
+            ? null 
+            : _imageUrlController.text.trim(),
+        imageBase64: _imageBase64,
+        priority: _priority,
+      );
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isBroadcast
+                  ? 'Notification sent to all students'
+                  : 'Notification sent successfully',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.kBackgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppTheme.kWhiteColor,
+        title: Text(
+          'Send Custom Notification',
+          style: TextStyle(
+            color: AppTheme.kDarkTextColor,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: AppTheme.kDarkTextColor),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Info Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.kPrimaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.kPrimaryColor.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppTheme.kPrimaryColor),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Custom notifications will be sent as push notifications and appear in the notification feed',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.kDarkTextColor.withOpacity(0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Title Field
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Title *',
+                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: AppTheme.kWhiteColor,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Body Field
+              TextFormField(
+                controller: _bodyController,
+                decoration: InputDecoration(
+                  labelText: 'Message *',
+                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: AppTheme.kWhiteColor,
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 4,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a message';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Priority Selector
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.kWhiteColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Priority',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.kDarkTextColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: NotificationPriority.values.map((priority) {
+                        final isSelected = _priority == priority;
+                        return ChoiceChip(
+                          label: Text(priority.toString().split('.').last.toUpperCase()),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() => _priority = priority);
+                          },
+                          selectedColor: AppTheme.kPrimaryColor,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppTheme.kDarkTextColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Broadcast Switch
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.kWhiteColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Broadcast to All Students',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.kDarkTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Send to all students in your university',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.kDarkTextColor.withOpacity(0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Switch(
+                      value: _isBroadcast,
+                      onChanged: (value) {
+                        setState(() => _isBroadcast = value);
+                      },
+                      activeColor: AppTheme.kPrimaryColor,
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Image Options
+              Text(
+                'Add Image (Optional)',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.kDarkTextColor,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Image URL Field
+              TextFormField(
+                controller: _imageUrlController,
+                decoration: InputDecoration(
+                  labelText: 'Image URL',
+                  labelStyle: TextStyle(color: AppTheme.kSecondaryColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppTheme.kPrimaryColor, width: 2),
+                  ),
+                  filled: true,
+                  fillColor: AppTheme.kWhiteColor,
+                  prefixIcon: Icon(Icons.link, color: AppTheme.kSecondaryColor),
+                  hintText: 'https://example.com/image.jpg',
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'OR',
+                      style: TextStyle(
+                        color: AppTheme.kDarkTextColor.withOpacity(0.5),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: Colors.grey.shade300,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Upload Image Button
+              OutlinedButton.icon(
+                onPressed: _pickImage,
+                icon: Icon(Icons.upload_file, color: AppTheme.kPrimaryColor),
+                label: Text(
+                  _imageBase64 != null ? 'Image Selected ✓' : 'Upload Image (Base64)',
+                  style: TextStyle(color: AppTheme.kPrimaryColor),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: BorderSide(color: AppTheme.kPrimaryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              
+              if (_imageBase64 != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Container(
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: AppTheme.kBackgroundColor,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.image, size: 50, color: AppTheme.kPrimaryColor),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Image Preview',
+                            style: TextStyle(
+                              color: AppTheme.kDarkTextColor.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              
+              const SizedBox(height: 24),
+              
+              // Send Button
+              ElevatedButton(
+                onPressed: _isSubmitting ? null : _sendNotification,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.kPrimaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.send, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            _isBroadcast ? 'Send to All Students' : 'Send Notification',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Demo app section removed — notifications library provides service and widgets for app integration.

@@ -3,6 +3,9 @@ Functions helper notes
 This functions folder includes two callable functions:
 - `setUserRole` (existing): used by super-admins to set roles
 - `createFacultyInvite` (added): callable by admins/super-admins to generate an invite, persist it to `invites` collection, and send an email via SendGrid
+ - `createFacultyInvite` (added): callable by admins/super-admins to generate an invite, persist it to `invites` collection, and send an email via SendGrid
+ - `sendNotification` (added): callable to send an FCM push for a `notifications/{id}` doc. Payload: `{ notificationId }`.
+ - `subscribeToken` (added): callable to subscribe a device token to `university_{uniId}` topic. Payload: `{ token, universityId }`.
 
 Environment setup
 1. Install dependencies:
@@ -37,6 +40,8 @@ firebase emulators:start --only auth,firestore,functions
 Notes
 - If SendGrid is not configured, the function will store the invite in Firestore and return `{emailed:false}`.
 - The function returns the generated code to the caller when invoked by an admin. If you prefer not to return the code to the client, modify the function to return only `{success:true}`.
+ - `sendNotification` expects a notification document in `notifications/` with fields like `title`, `body`, `universityId`. It will send to `users/{userId}/fcmTokens` if `userId` is set, otherwise to topic `university_{universityId}`.
+ - `subscribeToken` helps subscribe tokens to a topic; the client calls this after saving tokens if desired.
 Firebase Cloud Function: setUserRole
 
 What it does

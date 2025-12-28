@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'shared.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'notifications.dart';
 
 // --- FIXED IMPORT PATH HERE ---
 import 'timetable/FACULTY/faculty_invite_screen.dart';
@@ -327,6 +329,15 @@ class _LoginViewState extends State<LoginView> {
                         .logIn(email: _email.text.trim(), password: _password.text);
                     
                     if (user != null) {
+                      // Register FCM token for push notifications
+                      try {
+                        final token = await FirebaseMessaging.instance.getToken();
+                        if (token != null) {
+                          await NotificationService().registerFcmToken(userId: user.uid, token: token);
+                        }
+                      } catch (e) {
+                        debugPrint('FCM token registration failed: $e');
+                      }
                       // 2. CHECK DATABASE FOR ROLE & REDIRECT
                       final doc = await FirebaseFirestore.instance
                           .collection('users')

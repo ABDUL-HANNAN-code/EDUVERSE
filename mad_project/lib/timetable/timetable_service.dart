@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
+import '../notifications.dart';
 
 class TimetableService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -108,11 +110,25 @@ class TimetableService {
     required String uniId,
     required Map<String, dynamic> data,
   }) async {
-    await _db
+    final docRef = await _db
         .collection('universities')
         .doc(uniId)
         .collection('timetables')
         .add(data);
+
+    // Trigger notification about the new class
+    try {
+      final notifier = NotificationService();
+      final subject = data['subject']?.toString() ?? 'Timetable update';
+      await notifier.notifyTimetableUpdate(
+        universityId: uniId,
+        className: subject,
+        userId: null,
+      );
+    } catch (e) {
+      // Non-fatal: log and continue
+      debugPrint('Failed to notify timetable update: $e');
+    }
   }
 
   Future<void> deleteClass(String uniId, String docId) async {
@@ -148,12 +164,23 @@ class TimetableService {
       return conflict;
     }
 
-    await _db
-        .collection('universities')
-        .doc(uniId)
-        .collection('timetables')
-        .doc(docId)
-        .update({'start': newStart, 'end': newEnd});
+    // Fetch doc to read subject for notification
+    final docRef = _db.collection('universities').doc(uniId).collection('timetables').doc(docId);
+    final doc = await docRef.get();
+    final subject = (doc.exists ? (doc.data()?['subject'] as String?) : null) ?? 'Timetable update';
+
+    await docRef.update({'start': newStart, 'end': newEnd});
+
+    // Notify students about timetable change
+    try {
+      final notifier = NotificationService();
+      await notifier.notifyTimetableUpdate(
+        universityId: uniId,
+        className: subject,
+      );
+    } catch (e) {
+      debugPrint('Failed to notify timetable update: $e');
+    }
 
     return null; // Success
   }

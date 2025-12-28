@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 // Ensure you have these files in your project, or remove imports if unused
 // shared.dart removed from this file to avoid unused-import issues
 import 'auth.dart';
+import 'notifications.dart';
 
 // ==========================================
 // PHONE VALIDATION HELPER
@@ -206,9 +207,9 @@ class FirestoreMethods {
             .doc(postId)
             .set(post.toJson());
       }
-      return "Success";
+      return postId;
     } catch (e) {
-      return e.toString();
+      rethrow;
     }
   }
 
@@ -1401,15 +1402,22 @@ class _CreatePostViewState extends State<CreatePostView> {
         uniId,
       );
       setState(() => isLoading = false);
-      if (res == "Success") {
-        Get.back();
-        Get.snackbar("Success", "Post created",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.green.shade100);
-      } else {
-        Get.snackbar("Error", res,
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red.shade100);
+      // uploadPost now returns the created `postId` on success.
+      Get.back();
+      Get.snackbar("Success", "Post created",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.green.shade100);
+
+      // Trigger a lost-and-found notification for this university.
+      try {
+        await NotificationService().notifyLostAndFound(
+          universityId: uniId,
+          itemName: _title.text,
+          isLost: postType.toLowerCase().contains('lost'),
+          postId: res,
+        );
+      } catch (e) {
+        debugPrint('Failed to trigger lost&found notification: $e');
       }
     } catch (e) {
       setState(() => isLoading = false);

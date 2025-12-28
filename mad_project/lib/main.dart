@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -12,6 +15,7 @@ import 'homepage/profile_screen.dart';
 
 // Announcements module
 import 'announcements/student_announcement_view.dart';
+import 'notifications.dart';
 
 // Complaints views
 import 'complaints/views/student_complaint_view.dart';
@@ -61,6 +65,114 @@ void main() async {
     FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
   } catch (e) {}
 
+  // Register FCM token and listen for token refresh (if user signed in)
+  try {
+    FirebaseMessaging.instance.getToken().then((token) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && token != null) {
+        await NotificationService().registerFcmToken(userId: user.uid, token: token);
+      }
+    });
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && token != null) {
+        await NotificationService().registerFcmToken(userId: user.uid, token: token);
+      }
+    });
+  } catch (e) {
+    debugPrint('FCM init error: $e');
+  }
+
+    // Initialize local notifications and FCM handlers (skip local notifications on web)
+    try {
+      if (!kIsWeb) {
+        await _initLocalNotifications();
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+        // Foreground message -> show local notification (mobile only)
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+          try {
+            final notif = message.notification;
+            final title = notif?.title ?? '';
+            final body = notif?.body ?? '';
+
+            const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+              'eduverse_high',
+              'Eduverse High Priority',
+              channelDescription: 'High priority notifications for Eduverse',
+              importance: Importance.high,
+              priority: Priority.high,
+            );
+            const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+
+            await flutterLocalNotificationsPlugin.show(
+              message.hashCode,
+              title,
+              body,
+              platformDetails,
+              payload: message.data['notificationId']?.toString() ?? '',
+            );
+          } catch (e) {
+            debugPrint('onMessage show local notification error: $e');
+          }
+        });
+      }
+
+      // Request permission (iOS) and attempt to ensure notification permission on Android
+      try {
+        final settings = await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        debugPrint('FCM permission status: ${settings.authorizationStatus}');
+      } catch (e) {
+        debugPrint('FCM requestPermission error: $e');
+      }
+
+      // When the app is opened from a terminated state via a notification
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) async {
+        if (message != null) {
+          final nid = message.data['notificationId'];
+          // navigate to notification page
+          try {
+            final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+            Get.toNamed('/notifications', arguments: {'userId': uid});
+          } catch (_) {}
+        }
+      });
+
+      // When the app is opened from background via a notification tap
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        final nid = message.data['notificationId'];
+        try {
+          final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+          Get.toNamed('/notifications', arguments: {'userId': uid});
+        } catch (_) {}
+      });
+    } catch (e) {
+      debugPrint('FCM handlers init error: $e');
+    }
+
+  // Foreground message handler: show simple SnackBar
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    try {
+      final notif = message.notification;
+      final title = notif?.title ?? '';
+      final body = notif?.body ?? '';
+      // Use navigatorKey or current context via WidgetsBinding
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final navigator = Navigator.of(Get.context!);
+        ScaffoldMessenger.of(navigator.context).showSnackBar(
+          SnackBar(content: Text('$title\n$body')),
+        );
+      });
+    } catch (e) {
+      debugPrint('onMessage handler error: $e');
+    }
+  });
+
   // Log recruiter creds if available (Debug only)
   try {
     final recruiterEmail = Platform.environment['RECRUITER_ADMIN_EMAIL'] ?? 'recruiter@admin.test';
@@ -99,6 +211,52 @@ void main() async {
   };
 
   runApp(const UniversityApp());
+}
+
+// Background handler must be a top-level function
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  } catch (_) {}
+  // You may want to write the background notification to Firestore or process data
+  debugPrint('FCM background message received: ${message.messageId}');
+}
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+Future<void> _initLocalNotifications() async {
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings();
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      // NotificationResponse.payload contains the string payload (notificationId or routing data)
+      final payload = response.payload;
+      debugPrint('Local notification tapped, payload: $payload');
+      try {
+        final ctx = Get.context;
+        if (ctx != null && payload != null && payload.isNotEmpty) {
+          Get.toNamed('/notifications');
+        }
+      } catch (_) {}
+    },
+  );
+
+  // Create Android notification channel
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'eduverse_high',
+    'Eduverse High Priority',
+    importance: Importance.high,
+    description: 'High priority notifications for Eduverse',
+  );
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
 }
 
 class ErrorReportApp extends StatelessWidget {
@@ -175,6 +333,24 @@ class UniversityApp extends StatelessWidget {
             GetPage(name: '/announcements', page: () => const StudentAnnouncementFeed()),
             // alias route (used by dashboard tile)
             GetPage(name: '/student_announcements_view', page: () => const StudentAnnouncementFeed()),
+            // Notifications
+            GetPage(
+              name: '/notifications',
+              page: () {
+                final args = Get.arguments as Map<String, dynamic>?;
+                return NotificationPage(
+                  userId: args?['userId'] ?? FirebaseAuth.instance.currentUser?.uid ?? '',
+                  universityId: args?['universityId'] ?? '',
+                );
+              },
+            ), // navigator will supply params when used
+            GetPage(
+              name: '/notification_settings',
+              page: () {
+                final args = Get.arguments as Map<String, dynamic>?;
+                return NotificationSettingsPage(userId: args?['userId'] ?? FirebaseAuth.instance.currentUser?.uid ?? '');
+              },
+            ),
           ],
         );
       },

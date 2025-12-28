@@ -1,6 +1,8 @@
 // lib/complaints/services/complaint_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import '../../notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/complaint_model.dart';
 
@@ -145,6 +147,22 @@ class ComplaintService {
         batch.set(uniRef, data);
         await batch.commit();
 
+        // Notify student that complaint was submitted
+        try {
+          final studentId = enriched.studentId;
+          if (studentId != null && studentId.isNotEmpty) {
+            await NotificationService().notifyComplaintStatus(
+              userId: studentId,
+              universityId: uniId,
+              isResolved: false,
+              complaintTitle: enriched.title,
+              complaintId: docRef.id,
+            );
+          }
+        } catch (e) {
+          debugPrint('Failed to notify complaint submission: $e');
+        }
+
         return docRef.id;
       } on FirebaseException catch (fe) {
         if (fe.code == 'permission-denied') {
@@ -274,6 +292,21 @@ class ComplaintService {
         });
       }
       await batch.commit();
+      // Notify the student of the status update
+      try {
+        final studentId = doc.data()?['studentId'] as String? ?? '';
+        if (studentId.isNotEmpty) {
+          await NotificationService().notifyComplaintStatus(
+            userId: studentId,
+            universityId: uniId,
+            isResolved: newStatus == ComplaintStatus.resolved,
+            complaintTitle: doc.data()?['title'] ?? 'Complaint',
+            complaintId: complaintId,
+          );
+        }
+      } catch (e) {
+        debugPrint('Failed to notify complaint status change: $e');
+      }
     } catch (e) {
       throw Exception('Failed to update status: $e');
     }
@@ -303,6 +336,23 @@ class ComplaintService {
             {'adminReply': reply, 'updatedAt': FieldValue.serverTimestamp()});
       }
       await batch.commit();
+      // Notify student of admin reply (use current status to determine resolved)
+      try {
+        final docAfter = await rootRef.get();
+        final studentId = docAfter.data()?['studentId'] as String? ?? '';
+        final isResolved = (docAfter.data()?['status'] as String?) == ComplaintStatus.resolved.name;
+        if (studentId.isNotEmpty) {
+          await NotificationService().notifyComplaintStatus(
+            userId: studentId,
+            universityId: uniId,
+            isResolved: isResolved,
+            complaintTitle: docAfter.data()?['title'] ?? 'Complaint',
+            complaintId: complaintId,
+          );
+        }
+      } catch (e) {
+        debugPrint('Failed to notify complaint status change: $e');
+      }
     } catch (e) {
       throw Exception('Failed to add reply: $e');
     }
@@ -339,6 +389,22 @@ class ComplaintService {
         });
       }
       await batch.commit();
+      // Notify student of status + reply
+      try {
+        final docAfter = await rootRef.get();
+        final studentId = docAfter.data()?['studentId'] as String? ?? '';
+        if (studentId.isNotEmpty) {
+          await NotificationService().notifyComplaintStatus(
+            userId: studentId,
+            universityId: uniId,
+            isResolved: newStatus == ComplaintStatus.resolved,
+            complaintTitle: docAfter.data()?['title'] ?? 'Complaint',
+            complaintId: complaintId,
+          );
+        }
+      } catch (e) {
+        debugPrint('Failed to notify complaint update with reply: $e');
+      }
     } catch (e) {
       throw Exception('Failed to update complaint: $e');
     }

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'shared.dart';
 import 'lost_and_found.dart';
+import 'notifications.dart';
 import 'poster/marketplace_poster_slideshow.dart';
 
 // Minimal, robust marketplace implementation to restore app compilation.
@@ -123,7 +124,7 @@ class MarketplaceService {
       required Uint8List imageData}) async {
     try {
       final base64Image = base64Encode(imageData);
-      await _db
+      final docRef = await _db
           .collection('universities')
           .doc(uniId)
           .collection('marketplace_items')
@@ -140,7 +141,21 @@ class MarketplaceService {
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'available',
       });
-      return 'Success';
+
+      // Notify university about new marketplace item
+      try {
+        await NotificationService().notifyMarketplace(
+          universityId: uniId,
+          itemName: title,
+          price: price.toStringAsFixed(0),
+          postId: docRef.id,
+          imageUrl: null,
+        );
+      } catch (e) {
+        debugPrint('Failed to notify marketplace: $e');
+      }
+
+      return docRef.id;
     } catch (e) {
       debugPrint('addItem error: $e');
       return e.toString();
@@ -1736,7 +1751,7 @@ class _SellItemViewState extends State<SellItemView> {
 
       setState(() => isLoading = false);
 
-      if (result == "Success") {
+      if (result.isNotEmpty && !result.toLowerCase().contains('error')) {
         // Navigate the user to their ads so they can immediately see the new post
         Get.off(() => MyAdsView(uniId: widget.uniId, userId: user.uid));
         MySnackBar().mySnackBar(

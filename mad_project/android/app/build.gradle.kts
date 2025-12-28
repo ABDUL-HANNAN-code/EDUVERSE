@@ -28,7 +28,7 @@ android {
         applicationId = "com.example.mad_project"
 
         // 🔧 FIX 2: cloud_functions requires minSdk 23
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

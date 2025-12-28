@@ -1,102 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // TESTING ONLY: allow any authenticated user full read/write access.
-    // This is insecure and must be tightened before production.
+    // Minimal development rules: allow reads/writes for authenticated users.
+    // WARNING: This is permissive and intended only for local/dev testing.
+    function isSignedIn() { return request.auth != null; }
+
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
   }
 }
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // TESTING ONLY: allow any authenticated user full read/write access.
-    // This is insecure and must be tightened before production.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // TESTING ONLY: allow any authenticated user full read/write access.
-    // This is insecure and must be tightened before production.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // TESTING ONLY: Allow authenticated users whose `users/{uid}.role == 'recruiter'`
-    // full read/write access to all documents. This is permissive and unsafe for
-    // production; use only for local/dev testing.
-    match /{document=**} {
-      allow read, write: if request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'recruiter';
-    }
-
-  }
-}
-        );
-        match /{subCollection=**} {
-          allow read, write: if request.auth != null && (
-            request.auth.uid == userDoc ||
-            rules_version = '2';
-            service cloud.firestore {
-              match /databases/{database}/documents {
-                // Helper functions
-                function isSignedIn() { return request.auth != null; }
-                function userRole(uid) {
-                  return get(/databases/$(database)/documents/users/$(uid)).data.role;
-                }
-                function isSuperAdmin(uid) {
-                  return exists(/databases/$(database)/documents/super_admins/$(uid));
-                }
-                function isAdmin(uid) {
-                  return userRole(uid) == 'admin' || isSuperAdmin(uid);
-                }
-
-                // Invites: only admins/super-admins may create/update/delete invites.
-                // Invite recipients may read invites addressed to their email.
-                match /invites/{inviteId} {
-                  allow create, update, delete: if isSignedIn() && isAdmin(request.auth.uid);
-                  allow read: if isSignedIn() && (
-                    isAdmin(request.auth.uid) ||
-                    (resource.data.email != null && resource.data.email == request.auth.token.email)
-                  );
-                }
-
-                // Appointments: creators can create with uid == caller; faculty and admins
-                // can update appointment status. Reads are allowed for convenience.
-                match /appointments/{appointmentId} {
-                  allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-                  allow read: if true;
-                  allow update, delete: if isSignedIn() && (
-                    resource.data.facultyId == request.auth.uid ||
-                    resource.data.uid == request.auth.uid ||
-                    isAdmin(request.auth.uid)
-                  );
-                }
-
-                // Users: users can read/write their own documents; admins can manage any user.
-                match /users/{userId} {
-                  allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin(request.auth.uid));
-                }
-
-                // Super-admin list: only super-admins may read/write
-                match /super_admins/{uid} {
-                  allow read, write: if isSignedIn() && isSuperAdmin(request.auth.uid);
-                }
-
-                // Default: allow reads but restrict writes to admins only. Adjust as needed.
-                match /{document=**} {
-                  allow read: if true;
-                  allow write: if isSignedIn() && isAdmin(request.auth.uid);
-                }
-              }
-            }

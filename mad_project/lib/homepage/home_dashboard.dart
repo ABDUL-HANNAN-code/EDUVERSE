@@ -6,6 +6,7 @@ import 'dart:async';
 import '../shared.dart';
 import '../poster/marketplace_poster_slideshow.dart';
 import '../announcements/student_announcement_view.dart';
+import '../notifications.dart';
 
 /// Modern Home/Dashboard Module - Redesigned for Eduverse
 class HomeDashboard extends StatefulWidget {
@@ -37,6 +38,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   String userName = 'User';
   String userRole = 'student';
   String? userUniId;
+  int _unreadCount = 0;
+  final NotificationService _notificationService = NotificationService();
 
   // PageView controller for header carousel
   final PageController _pageController = PageController();
@@ -87,10 +90,24 @@ class _HomeDashboardState extends State<HomeDashboard> {
             userRole = data?['role'] ?? 'student';
             userUniId = data?['uniId']?.toString();
           });
+          // load unread notifications count
+          _loadUnreadCount();
         }
       }
     } catch (e) {
       debugPrint('Error loading user name: $e');
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && userUniId != null) {
+        final count = await _notificationService.getUnreadCount(user.uid, userUniId!);
+        if (mounted) setState(() => _unreadCount = count);
+      }
+    } catch (e) {
+      debugPrint('Error loading unread count: $e');
     }
   }
 
@@ -171,6 +188,36 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         color: AppColors.mainColor),
                     onPressed: () => Get.toNamed('/admin'),
                   ),
+                // Notifications icon with badge
+                IconButton(
+                  icon: Stack(
+                    children: [
+                      const Icon(Icons.notifications, size: 24),
+                      if (_unreadCount > 0)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                            child: Text(
+                              _unreadCount > 99 ? '99+' : '$_unreadCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  onPressed: () {
+                    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                    Get.toNamed('/notifications', arguments: {'userId': uid, 'universityId': userUniId ?? ''})?.then((_) => _loadUnreadCount());
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.person),
                   onPressed: () => Get.toNamed('/profile'),

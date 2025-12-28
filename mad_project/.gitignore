@@ -54,3 +54,6 @@ credietntail.txt
 # --- ADDED: Secrets & Env Files ---
 .env
 assets/.env
+
+# Ignore the secret key
+assets/service_account.json
